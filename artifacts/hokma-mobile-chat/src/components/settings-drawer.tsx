@@ -19,14 +19,18 @@ interface SettingsDrawerProps {
   engineConfig: EngineConfig;
   setEngineConfig: (config: EngineConfig) => void;
   connectionStatus: ConnectionStatus;
+  connectionError: string;
   testConnection: (config?: EngineConfig) => Promise<boolean>;
 }
+
+const PHONE_IP_ENDPOINT = "http://10.168.212.48:18800/v1/chat/completions";
 
 export function SettingsDrawer({
   onClearChat,
   engineConfig,
   setEngineConfig,
   connectionStatus,
+  connectionError,
   testConnection,
 }: SettingsDrawerProps) {
   const [draft, setDraft] = useState(engineConfig);
@@ -114,8 +118,16 @@ export function SettingsDrawer({
                   value={draft.endpoint}
                   onChange={(event) => setDraft((current) => ({ ...current, endpoint: event.target.value }))}
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-                  placeholder="http://localhost:18800/v1/chat/completions"
+                  placeholder={PHONE_IP_ENDPOINT}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-8 rounded-full px-3 text-xs"
+                  onClick={() => setDraft((current) => ({ ...current, endpoint: PHONE_IP_ENDPOINT }))}
+                >
+                  Usar IP do celular
+                </Button>
               </div>
 
               <div className="space-y-2">
@@ -162,6 +174,12 @@ export function SettingsDrawer({
                   Testar
                 </Button>
               </div>
+
+              {connectionError && (
+                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-xs leading-5 text-red-200">
+                  {connectionError}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
