@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef } from "react";
 import { Send, Mic, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -58,7 +58,7 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Command Hokma..."
+            placeholder="Comande o Hokma..."
             className="w-full bg-transparent text-foreground placeholder:text-muted-foreground resize-none py-3 px-4 max-h-[120px] min-h-[44px] focus:outline-none text-sm block"
             rows={1}
             disabled={isStreaming}

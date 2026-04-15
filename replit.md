@@ -4,7 +4,7 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-Current primary app: **Hokma Mobile Chat**, a mobile-first preview for testing a Jarvis-style AI agent chat experience inspired by the user's Hokma.chat repository. The first preview is local-only and simulates streaming agent responses, command chips, mobile voice affordances, agent switching, and settings placeholders before connecting a real AI/provider or device-control runtime.
+Current primary app: **Hokma Mobile Chat**, a mobile-first preview for testing a Jarvis-style AI agent chat experience inspired by the user's Hokma.chat repository. The app can run in preview mode or connect to the user's HokClaw server, defaulting to `http://localhost:18800/v1/chat/completions` with model `llama-3.1-8b-instant`.
 
 ## Stack
 
