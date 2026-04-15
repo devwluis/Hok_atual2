@@ -15,7 +15,11 @@ export default function ChatPage() {
     sendMessage, 
     activeAgent, 
     setActiveAgent,
-    clearChat
+    clearChat,
+    engineConfig,
+    setEngineConfig,
+    connectionStatus,
+    testConnection,
   } = useChat();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -44,10 +48,18 @@ export default function ChatPage() {
         
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            <span className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest">Secure</span>
+            <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${connectionStatus === "offline" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : connectionStatus === "testing" ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"}`} />
+            <span className={`text-[10px] font-mono uppercase tracking-widest ${connectionStatus === "offline" ? "text-red-400" : connectionStatus === "testing" ? "text-amber-300" : "text-emerald-500"}`}>
+              {engineConfig.mode === "preview" ? "Preview" : connectionStatus === "offline" ? "Offline" : connectionStatus === "testing" ? "Teste" : "HokClaw"}
+            </span>
           </div>
-          <SettingsDrawer onClearChat={clearChat} />
+          <SettingsDrawer
+            onClearChat={clearChat}
+            engineConfig={engineConfig}
+            setEngineConfig={setEngineConfig}
+            connectionStatus={connectionStatus}
+            testConnection={testConnection}
+          />
         </div>
       </header>
 
@@ -67,7 +79,9 @@ export default function ChatPage() {
                     </div>
                     <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.85)]" />
-                      <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-emerald-300">Previa ativa</span>
+                      <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-emerald-300">
+                        {engineConfig.mode === "preview" ? "Previa ativa" : "Motor conectado"}
+                      </span>
                     </div>
                   </div>
 
@@ -77,7 +91,7 @@ export default function ChatPage() {
                       Seu Jarvis em modo teste, pronto para evoluir.
                     </h1>
                     <p className="max-w-md text-sm leading-6 text-muted-foreground">
-                      Converse com agentes, simule comandos para PC ou celular, teste fluxos de voz e refine a experiencia antes de conectar o motor real.
+                      Converse com agentes usando seu HokClaw no Termux: {engineConfig.model} em {engineConfig.endpoint}.
                     </p>
                   </div>
 
@@ -113,7 +127,9 @@ export default function ChatPage() {
                       </span>
                       <span className="flex-1">
                         <span className="block font-medium">{cmd.label}</span>
-                        <span className="mt-0.5 block text-xs text-muted-foreground">Toque para simular uma resposta do agente</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {engineConfig.mode === "preview" ? "Toque para simular uma resposta do agente" : "Toque para enviar ao motor configurado"}
+                        </span>
                       </span>
                       <Radio className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                     </button>
