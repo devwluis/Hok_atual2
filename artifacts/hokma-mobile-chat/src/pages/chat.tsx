@@ -19,6 +19,7 @@ export default function ChatPage() {
     engineConfig,
     setEngineConfig,
     connectionStatus,
+    connectionError,
     testConnection,
   } = useChat();
 
@@ -58,6 +59,7 @@ export default function ChatPage() {
             engineConfig={engineConfig}
             setEngineConfig={setEngineConfig}
             connectionStatus={connectionStatus}
+            connectionError={connectionError}
             testConnection={testConnection}
           />
         </div>

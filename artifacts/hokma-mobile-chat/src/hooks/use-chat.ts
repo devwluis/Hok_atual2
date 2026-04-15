@@ -28,10 +28,11 @@ export type EngineConfig = {
 export type ConnectionStatus = "idle" | "online" | "offline" | "testing";
 
 const STORE_KEY = "hokma_mobile_engine_config";
+const PHONE_IP_ENDPOINT = "http://10.168.212.48:18800/v1/chat/completions";
 
 const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   mode: "hokclaw",
-  endpoint: "http://localhost:18800/v1/chat/completions",
+  endpoint: PHONE_IP_ENDPOINT,
   model: "llama-3.1-8b-instant",
   apiKey: "",
 };
@@ -47,7 +48,11 @@ function loadEngineConfig(): EngineConfig {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return DEFAULT_ENGINE_CONFIG;
-    return { ...DEFAULT_ENGINE_CONFIG, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULT_ENGINE_CONFIG, ...JSON.parse(raw) };
+    if (parsed.endpoint.includes("localhost:18800")) {
+      return { ...parsed, endpoint: PHONE_IP_ENDPOINT };
+    }
+    return parsed;
   } catch {
     return DEFAULT_ENGINE_CONFIG;
   }
@@ -70,6 +75,14 @@ function getSystemPrompt(agent: Agent) {
   if (agent.id === "automation") return `${base} Atue como orquestrador de automacoes. Sempre explique permissoes e riscos antes de executar algo sensivel.`;
   if (agent.id === "vision") return `${base} Atue como modulo de visao e contexto visual. Quando nao houver imagem, peca o contexto necessario.`;
   return base;
+}
+
+function getConnectionErrorMessage(error: unknown, endpoint: string) {
+  const rawMessage = error instanceof Error ? error.message : "Erro desconhecido";
+  if (rawMessage === "Failed to fetch" || rawMessage === "NetworkError when attempting to fetch resource.") {
+    return `O navegador nao conseguiu acessar ${endpoint}. Confira se o celular e esta previa estao na mesma rede, se o servidor HokClaw esta ligado na porta 18800 e se ele permite CORS para chamadas do Chrome.`;
+  }
+  return rawMessage;
 }
 
 async function streamPreviewResponse(
@@ -99,6 +112,7 @@ export function useChat() {
   const [activeAgent, setActiveAgent] = useState<Agent>(AGENTS[0]);
   const [engineConfig, setEngineConfigState] = useState<EngineConfig>(() => loadEngineConfig());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
+  const [connectionError, setConnectionError] = useState("");
 
   const updateAssistantMessage = useCallback((messageId: string, content: string) => {
     setMessages((prev) =>
@@ -119,6 +133,7 @@ export function useChat() {
     saveEngineConfig(normalized);
     setEngineConfigState(normalized);
     setConnectionStatus("idle");
+    setConnectionError("");
   }, []);
   
   const sendMessage = useCallback(async (content: string) => {
@@ -191,6 +206,7 @@ export function useChat() {
           throw new Error(`HTTP ${response.status}${errorText ? `: ${errorText.slice(0, 180)}` : ""}`);
         }
 
+        setConnectionError("");
         setConnectionStatus("online");
 
         const contentType = response.headers.get("content-type") || "";
@@ -234,10 +250,12 @@ export function useChat() {
       }
     } catch (error) {
       setConnectionStatus("offline");
-      const message = error instanceof Error ? error.message : "Erro desconhecido";
+      const endpoint = normalizeChatEndpoint(engineConfig.endpoint);
+      const message = getConnectionErrorMessage(error, endpoint);
+      setConnectionError(message);
       updateAssistantMessage(
         astMsgId,
-        `Nao consegui conectar ao motor configurado.\n\nEndpoint: ${normalizeChatEndpoint(engineConfig.endpoint)}\nModelo: ${engineConfig.model}\n\nDetalhe: ${message}\n\nSe estiver usando o Termux no celular, abra esta previa no mesmo celular ou use o IP do aparelho na rede, por exemplo: http://IP_DO_CELULAR:18800/v1/chat/completions. O servidor tambem precisa permitir acesso pelo navegador.`,
+        `Nao consegui conectar ao motor configurado.\n\nEndpoint: ${endpoint}\nModelo: ${engineConfig.model}\n\nDetalhe: ${message}\n\nNo seu caso, use este endpoint: ${PHONE_IP_ENDPOINT}. Se ainda falhar, o servidor HokClaw precisa liberar CORS para chamadas do Chrome.`,
       );
     } finally {
       setMessages(prev => 
@@ -261,10 +279,12 @@ export function useChat() {
 
     if (config.mode === "preview") {
       setConnectionStatus("online");
+      setConnectionError("");
       return true;
     }
 
     setConnectionStatus("testing");
+    setConnectionError("");
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -287,9 +307,11 @@ export function useChat() {
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setConnectionStatus("online");
+      setConnectionError("");
       return true;
-    } catch {
+    } catch (error) {
       setConnectionStatus("offline");
+      setConnectionError(getConnectionErrorMessage(error, normalizeChatEndpoint(config.endpoint)));
       return false;
     }
   }, [engineConfig]);
@@ -315,6 +337,7 @@ export function useChat() {
     engineConfig,
     setEngineConfig,
     connectionStatus,
+    connectionError,
     testConnection,
   };
 }
