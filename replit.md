@@ -4,6 +4,8 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+Current primary app: **Hokma Mobile Chat**, a mobile-first preview for testing a Jarvis-style AI agent chat experience inspired by the user's Hokma.chat repository. The first preview is local-only and simulates streaming agent responses, command chips, mobile voice affordances, agent switching, and settings placeholders before connecting a real AI/provider or device-control runtime.
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
@@ -15,6 +17,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
+- **Frontend preview**: React + Vite mobile web app at `artifacts/hokma-mobile-chat`
 
 ## Key Commands
 
@@ -23,5 +26,6 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
+- `pnpm --filter @workspace/hokma-mobile-chat run dev` — run Hokma Mobile Chat preview
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
