@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
 import { useChat, MODEL_OPTIONS } from "@/hooks/use-chat";
 import { ChatMessage } from "@/components/chat-message";
 import { ChatInput } from "@/components/chat-input";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Archive, Bot, Braces, Cpu, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, UploadCloud, Zap } from "lucide-react";
+import { Archive, Bot, Braces, Cpu, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, Terminal, UploadCloud, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function DnaLogo() {
@@ -38,6 +39,12 @@ function SidebarContent({ onNewChat }: { onNewChat: () => void }) {
         <Plus className="h-4 w-4" />
         Novo chat
       </Button>
+      <Link href="/dashboard">
+        <Button variant="outline" className="h-11 w-full justify-start gap-2 rounded-2xl">
+          <Terminal className="h-4 w-4" />
+          Dashboard Hok
+        </Button>
+      </Link>
       <div className="space-y-2">
         <p className="px-1 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Modulos</p>
         {items.map((item) => {
