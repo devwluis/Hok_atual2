@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type Attachment = {
   id: string;
@@ -47,6 +47,7 @@ export type EngineConfig = {
 export type ConnectionStatus = "idle" | "online" | "offline" | "testing";
 
 const STORE_KEY = "hokma_mobile_engine_config";
+const MESSAGES_STORE_KEY = "hokma_mobile_messages";
 const PHONE_IP_ENDPOINT = "http://10.168.212.48:18800/v1/chat/completions";
 
 export const MODEL_OPTIONS: ModelOption[] = [
@@ -100,7 +101,7 @@ function normalizeChatEndpoint(endpoint: string) {
 }
 
 function getSystemPrompt(agent: Agent) {
-  const base = "Voce e o HokClaw AI Agent, um assistente em portugues brasileiro conectado ao conceito OpenClaw/Hokma. Seja direto, moderno, util e seguro. Interprete arquivos anexados quando houver contexto textual. Antes de executar qualquer acao sensivel em dispositivo, explique permissao, risco e proximo passo.";
+  const base = "Voce e o HokClaw AI Agent, um assistente conectado ao conceito OpenClaw/Hokma. Detecte o idioma do usuario e responda no mesmo idioma, com prioridade para portugues brasileiro quando houver duvida. Seja direto, moderno, util e seguro. Interprete arquivos anexados quando houver contexto textual. Antes de executar qualquer acao sensivel em dispositivo, explique permissao, risco e proximo passo.";
   if (agent.id === "coder") return `${base} Atue como engenheiro de software senior. Leia trechos de arquivos, proponha alteracoes e explique comandos de forma pratica.`;
   if (agent.id === "devops") return `${base} Atue como especialista em Termux, Linux, rede, servidores locais, ngrok, CORS, logs e automacoes.`;
   if (agent.id === "architect") return `${base} Atue como arquiteto de produto e sistemas. Transforme ideias em planos tecnicos claros e evolutivos.`;
@@ -143,15 +144,48 @@ async function streamPreviewResponse(
   }
 }
 
+function createWelcomeMessage(): Message {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: "HokClaw AI Agent online. Escolha um agente, selecione o modelo, anexe arquivos se precisar e envie seu comando.",
+    timestamp: new Date(),
+  };
+}
+
+function loadMessages(): Message[] {
+  try {
+    const raw = localStorage.getItem(MESSAGES_STORE_KEY);
+    if (!raw) return [createWelcomeMessage()];
+    const parsed = JSON.parse(raw) as Message[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [createWelcomeMessage()];
+    return parsed.map((message) => ({
+      ...message,
+      timestamp: new Date(message.timestamp),
+      isStreaming: false,
+    }));
+  } catch {
+    return [createWelcomeMessage()];
+  }
+}
+
+function saveMessages(messages: Message[]) {
+  const safeMessages = messages
+    .filter((message) => !message.isStreaming)
+    .slice(-120)
+    .map((message) => ({
+      ...message,
+      attachments: message.attachments?.map((attachment) => ({
+        ...attachment,
+        content: attachment.content?.slice(0, 60000),
+        dataUrl: attachment.dataUrl?.slice(0, 200000),
+      })),
+    }));
+  localStorage.setItem(MESSAGES_STORE_KEY, JSON.stringify(safeMessages));
+}
+
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: "HokClaw AI Agent online. Escolha um agente, selecione o modelo, anexe arquivos se precisar e envie seu comando.",
-      timestamp: new Date(),
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(() => loadMessages());
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeAgent, setActiveAgent] = useState<Agent>(AGENTS[0]);
@@ -168,6 +202,10 @@ export function useChat() {
       ),
     );
   }, []);
+
+  useEffect(() => {
+    saveMessages(messages);
+  }, [messages]);
 
   const setEngineConfig = useCallback((config: EngineConfig) => {
     const normalized = {
@@ -230,7 +268,7 @@ export function useChat() {
         const history = messages
           .filter((message) => message.role === "user" || message.role === "assistant")
           .filter((message) => !message.isStreaming && message.id !== "welcome")
-          .slice(-10)
+          .slice(-40)
           .map((message) => ({
             role: message.role === "assistant" ? "assistant" : "user",
             content: message.attachments?.length ? `${message.content}\n\nContexto dos anexos:\n${formatAttachmentsForPrompt(message.attachments)}` : message.content,
@@ -369,6 +407,7 @@ export function useChat() {
   }, [engineConfig]);
 
   const clearChat = useCallback(() => {
+    localStorage.removeItem(MESSAGES_STORE_KEY);
     setMessages([{
       id: "cleared",
       role: "system",

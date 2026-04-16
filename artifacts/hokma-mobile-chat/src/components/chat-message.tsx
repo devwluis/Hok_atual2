@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { Message } from "@/hooks/use-chat";
 import { cn } from "@/lib/utils";
-import { Bot, User, FileText, Image as ImageIcon, Archive } from "lucide-react";
+import { User, FileText, Image as ImageIcon, Archive, Check, Copy } from "lucide-react";
 
 interface ChatMessageProps {
   message: Message;
@@ -28,8 +28,15 @@ function AttachmentPill({ name, kind }: { name: string; kind: string }) {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const [copied, setCopied] = useState(false);
   const isUser = message.role === "user";
   const isSystem = message.role === "system";
+
+  const copyMessage = async () => {
+    await navigator.clipboard.writeText(message.content);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
+  };
 
   if (isSystem) {
     return (
@@ -72,6 +79,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <span />
               <span />
             </span>
+          )}
+          {!isUser && message.content && !message.isStreaming && (
+            <button
+              type="button"
+              onClick={copyMessage}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
           )}
         </div>
       </div>
