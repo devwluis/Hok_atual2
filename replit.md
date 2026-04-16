@@ -4,7 +4,7 @@
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
-Current primary app: **Hokma Mobile Chat**, a mobile-first preview for testing a Jarvis-style AI agent chat experience inspired by the user's Hokma.chat repository. The app can run in preview mode or connect to the user's HokClaw server, defaulting to `http://localhost:18800/v1/chat/completions` with model `llama-3.1-8b-instant`.
+Current primary app: **Hokma Mobile Chat**, now redesigned as a mobile-first **HokClaw AI Agent / OpenClaw** chat interface. It supports a modern ChatGPT-style experience, light/dark theme switching, DNA-style brand mark, five specialized agent modes, selectable AI model profiles, file/image attachment handling, and connection to the user's HokClaw server.
 
 ## Stack
 
@@ -18,6 +18,15 @@ Current primary app: **Hokma Mobile Chat**, a mobile-first preview for testing a
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
 - **Frontend preview**: React + Vite mobile web app at `artifacts/hokma-mobile-chat`
+
+## HokClaw App Notes
+
+- Default endpoint: `http://10.168.212.48:18800/v1/chat/completions`
+- Default model: `llama-3.1-8b-instant`
+- The frontend sends OpenAI-compatible chat completion requests and supports SSE streaming.
+- Models are user-selectable in the UI; HokClaw/OpenClaw is expected to route model IDs server-side.
+- File upload reads text/code files into prompt context, shows images as attachments, and marks zip/binary files as references until backend extraction is available.
+- User preference: Portuguese (Brazil), no emojis in UI labels, modern mobile-first design.
 
 ## Key Commands
 

@@ -1,19 +1,38 @@
 import { useCallback, useState } from "react";
 
+export type Attachment = {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  kind: "text" | "image" | "binary";
+  content?: string;
+  dataUrl?: string;
+};
+
 export type Message = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  attachments?: Attachment[];
 };
 
 export type Agent = {
   id: string;
   name: string;
+  shortName: string;
   icon: string;
   description: string;
   color: string;
+};
+
+export type ModelOption = {
+  id: string;
+  label: string;
+  provider: string;
+  description: string;
 };
 
 export type EngineMode = "hokclaw" | "preview";
@@ -30,6 +49,16 @@ export type ConnectionStatus = "idle" | "online" | "offline" | "testing";
 const STORE_KEY = "hokma_mobile_engine_config";
 const PHONE_IP_ENDPOINT = "http://10.168.212.48:18800/v1/chat/completions";
 
+export const MODEL_OPTIONS: ModelOption[] = [
+  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", provider: "Groq/HokClaw", description: "Rapido para chat local" },
+  { id: "gemini-1.5-flash", label: "Gemini Flash", provider: "Google", description: "Rapido e multimodal" },
+  { id: "gemini-1.5-pro", label: "Gemini Pro", provider: "Google", description: "Raciocinio mais forte" },
+  { id: "gpt-5-mini", label: "GPT-5 Mini", provider: "OpenAI", description: "Geral e economico" },
+  { id: "gpt-5-nano", label: "GPT-5 Nano", provider: "OpenAI", description: "Baixa latencia" },
+  { id: "qwen/qwen3-coder:free", label: "Qwen Coder Free", provider: "OpenRouter", description: "Codigo e agentes" },
+  { id: "anthropic/claude-3-haiku", label: "Claude Haiku", provider: "Anthropic", description: "Analise objetiva" },
+];
+
 const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   mode: "hokclaw",
   endpoint: PHONE_IP_ENDPOINT,
@@ -38,10 +67,11 @@ const DEFAULT_ENGINE_CONFIG: EngineConfig = {
 };
 
 export const AGENTS: Agent[] = [
-  { id: "hokma-core", name: "Hokma Core", icon: "BrainCircuit", description: "Raciocinio geral e comandos naturais", color: "text-primary" },
-  { id: "coder", name: "Codigo", icon: "Code2", description: "Programacao, scripts e analise tecnica", color: "text-blue-500" },
-  { id: "automation", name: "Automacao", icon: "Workflow", description: "Fluxos para PC, celular e APIs", color: "text-emerald-500" },
-  { id: "vision", name: "Visao", icon: "Eye", description: "Imagem, tela e contexto visual", color: "text-purple-500" },
+  { id: "openclaw", name: "OpenClaw", shortName: "Core", icon: "Dna", description: "Executor central, comandos naturais e orquestracao", color: "text-cyan-500" },
+  { id: "coder", name: "Coder", shortName: "Code", icon: "Code2", description: "Programacao, scripts, leitura de arquivos e debug", color: "text-blue-500" },
+  { id: "devops", name: "DevOps", shortName: "Ops", icon: "ServerCog", description: "Termux, servidores, rede, deploy e automacao", color: "text-emerald-500" },
+  { id: "architect", name: "Architect", shortName: "Plan", icon: "Network", description: "Arquitetura, produto e sistemas complexos", color: "text-violet-500" },
+  { id: "analyst", name: "Analyst", shortName: "Data", icon: "ScanSearch", description: "Pesquisa, analise de contexto e documentos", color: "text-amber-500" },
 ];
 
 function loadEngineConfig(): EngineConfig {
@@ -70,10 +100,11 @@ function normalizeChatEndpoint(endpoint: string) {
 }
 
 function getSystemPrompt(agent: Agent) {
-  const base = "Voce e Hokma AI, um assistente em portugues brasileiro para chat, codigo, automacao e controle seguro de dispositivos.";
-  if (agent.id === "coder") return `${base} Atue como engenheiro de software senior, direto e pratico.`;
-  if (agent.id === "automation") return `${base} Atue como orquestrador de automacoes. Sempre explique permissoes e riscos antes de executar algo sensivel.`;
-  if (agent.id === "vision") return `${base} Atue como modulo de visao e contexto visual. Quando nao houver imagem, peca o contexto necessario.`;
+  const base = "Voce e o HokClaw AI Agent, um assistente em portugues brasileiro conectado ao conceito OpenClaw/Hokma. Seja direto, moderno, util e seguro. Interprete arquivos anexados quando houver contexto textual. Antes de executar qualquer acao sensivel em dispositivo, explique permissao, risco e proximo passo.";
+  if (agent.id === "coder") return `${base} Atue como engenheiro de software senior. Leia trechos de arquivos, proponha alteracoes e explique comandos de forma pratica.`;
+  if (agent.id === "devops") return `${base} Atue como especialista em Termux, Linux, rede, servidores locais, ngrok, CORS, logs e automacoes.`;
+  if (agent.id === "architect") return `${base} Atue como arquiteto de produto e sistemas. Transforme ideias em planos tecnicos claros e evolutivos.`;
+  if (agent.id === "analyst") return `${base} Atue como analista. Resuma, compare, extraia requisitos e organize informacoes de anexos e conversas.`;
   return base;
 }
 
@@ -85,6 +116,20 @@ function getConnectionErrorMessage(error: unknown, endpoint: string) {
   return rawMessage;
 }
 
+function formatAttachmentsForPrompt(attachments: Attachment[]) {
+  if (!attachments.length) return "";
+  return attachments.map((attachment, index) => {
+    const header = `[Arquivo ${index + 1}: ${attachment.name} | ${attachment.type || "tipo desconhecido"} | ${Math.round(attachment.size / 1024)} KB]`;
+    if (attachment.kind === "text" && attachment.content) {
+      return `${header}\n${attachment.content.slice(0, 60000)}`;
+    }
+    if (attachment.kind === "image") {
+      return `${header}\nImagem anexada para referencia visual. Se o modelo atual nao tiver visao, peca ao usuario uma descricao ou use metadados disponiveis.`;
+    }
+    return `${header}\nArquivo binario anexado como referencia. Solicite extracao ou conversao caso precise ler o conteudo interno.`;
+  }).join("\n\n---\n\n");
+}
+
 async function streamPreviewResponse(
   text: string,
   messageId: string,
@@ -92,7 +137,7 @@ async function streamPreviewResponse(
 ) {
   let currentText = "";
   for (let i = 0; i < text.length; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 10 + Math.random() * 18));
+    await new Promise((resolve) => setTimeout(resolve, 7 + Math.random() * 14));
     currentText += text[i];
     updateMessage(messageId, currentText);
   }
@@ -103,7 +148,7 @@ export function useChat() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Hokma inicializado. Previa local pronta para testar comandos, agentes e fluxo mobile.",
+      content: "HokClaw AI Agent online. Escolha um agente, selecione o modelo, anexe arquivos se precisar e envie seu comando.",
       timestamp: new Date(),
     }
   ]);
@@ -135,22 +180,27 @@ export function useChat() {
     setConnectionStatus("idle");
     setConnectionError("");
   }, []);
-  
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return;
-    
+
+  const sendMessage = useCallback(async (content: string, attachments: Attachment[] = []) => {
+    if (!content.trim() && attachments.length === 0) return;
+
     const userMsgId = Math.random().toString(36).substring(7);
+    const attachmentContext = formatAttachmentsForPrompt(attachments);
+    const messageContent = content.trim() || "Analise os arquivos anexados.";
+    const promptContent = attachmentContext ? `${messageContent}\n\nContexto dos anexos:\n${attachmentContext}` : messageContent;
+
     const newMsg: Message = {
       id: userMsgId,
       role: "user",
-      content,
+      content: messageContent,
       timestamp: new Date(),
+      attachments,
     };
-    
+
     setMessages(prev => [...prev, newMsg]);
     setInput("");
     setIsStreaming(true);
-    
+
     const astMsgId = Math.random().toString(36).substring(7);
     setMessages(prev => [
       ...prev,
@@ -162,10 +212,11 @@ export function useChat() {
         isStreaming: true,
       }
     ]);
-    
+
     try {
       if (engineConfig.mode === "preview") {
-        const responseText = `Processando pelo agente ${activeAgent.name}.\n\nComando recebido: "${content}".\n\nResultado em modo previa: analise concluida, plano de acao preparado e execucao simulada com seguranca. Para usar seu servidor do celular, altere o motor para HokClaw Local.`;
+        const filesLine = attachments.length ? `\n\nArquivos recebidos: ${attachments.map((file) => file.name).join(", ")}. Vou tratar textos como contexto e imagens/binarios como referencias ate o servidor de visao estar ativo.` : "";
+        const responseText = `Agente ${activeAgent.name} usando ${engineConfig.model}.\n\nComando recebido: "${messageContent}".${filesLine}\n\nResposta em modo previa: o fluxo esta pronto para usar HokClaw como cerebro, alternar modelos gratuitos e interpretar anexos quando o backend expuser essa capacidade.`;
         await streamPreviewResponse(responseText, astMsgId, updateAssistantMessage);
       } else {
         const headers: Record<string, string> = {
@@ -182,10 +233,11 @@ export function useChat() {
           .slice(-10)
           .map((message) => ({
             role: message.role === "assistant" ? "assistant" : "user",
-            content: message.content,
+            content: message.attachments?.length ? `${message.content}\n\nContexto dos anexos:\n${formatAttachmentsForPrompt(message.attachments)}` : message.content,
           }));
 
-        const response = await fetch(normalizeChatEndpoint(engineConfig.endpoint), {
+        const endpoint = normalizeChatEndpoint(engineConfig.endpoint);
+        const response = await fetch(endpoint, {
           method: "POST",
           headers,
           body: JSON.stringify({
@@ -193,11 +245,11 @@ export function useChat() {
             messages: [
               { role: "system", content: getSystemPrompt(activeAgent) },
               ...history,
-              { role: "user", content },
+              { role: "user", content: promptContent },
             ],
             stream: true,
             temperature: 0.7,
-            max_tokens: 1600,
+            max_tokens: 1800,
           }),
         });
 
@@ -255,17 +307,17 @@ export function useChat() {
       setConnectionError(message);
       updateAssistantMessage(
         astMsgId,
-        `Nao consegui conectar ao motor configurado.\n\nEndpoint: ${endpoint}\nModelo: ${engineConfig.model}\n\nDetalhe: ${message}\n\nNo seu caso, use este endpoint: ${PHONE_IP_ENDPOINT}. Se ainda falhar, o servidor HokClaw precisa liberar CORS para chamadas do Chrome.`,
+        `Nao consegui conectar ao motor configurado.\n\nEndpoint: ${endpoint}\nModelo: ${engineConfig.model}\n\nDetalhe: ${message}\n\nSe continuar falhando, confirme se o HokClaw esta ouvindo em 0.0.0.0:18800 e com CORS liberado para o Chrome.`,
       );
     } finally {
-      setMessages(prev => 
-        prev.map(msg => 
-          msg.id === astMsgId 
-            ? { ...msg, isStreaming: false } 
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === astMsgId
+            ? { ...msg, isStreaming: false }
             : msg
         )
       );
-      
+
       setIsStreaming(false);
     }
   }, [activeAgent, engineConfig, messages, updateAssistantMessage]);
@@ -320,7 +372,7 @@ export function useChat() {
     setMessages([{
       id: "cleared",
       role: "system",
-      content: "Memoria da sessao limpa. Previa reiniciada.",
+      content: "Memoria da sessao limpa. Novo contexto iniciado.",
       timestamp: new Date(),
     }]);
   }, []);

@@ -1,10 +1,30 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { Message } from "@/hooks/use-chat";
 import { cn } from "@/lib/utils";
-import { Bot, User, TerminalSquare } from "lucide-react";
+import { Bot, User, FileText, Image as ImageIcon, Archive } from "lucide-react";
 
 interface ChatMessageProps {
   message: Message;
+}
+
+function DnaMark() {
+  return (
+    <div className="dna-mark-small">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
+function AttachmentPill({ name, kind }: { name: string; kind: string }) {
+  const Icon = kind === "image" ? ImageIcon : kind === "binary" ? Archive : FileText;
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-border bg-background/55 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+      <Icon className="h-3.5 w-3.5" />
+      <span className="max-w-[180px] truncate">{name}</span>
+    </div>
+  );
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
@@ -13,8 +33,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   if (isSystem) {
     return (
-      <div className="flex justify-center my-4">
-        <span className="text-xs text-muted-foreground uppercase tracking-widest bg-secondary/50 px-3 py-1 rounded-full border border-border">
+      <div className="my-5 flex justify-center">
+        <span className="rounded-full border border-border bg-secondary/60 px-3 py-1 text-xs uppercase tracking-[0.22em] text-muted-foreground">
           {message.content}
         </span>
       </div>
@@ -22,35 +42,38 @@ export function ChatMessage({ message }: ChatMessageProps) {
   }
 
   return (
-    <div 
-      className={cn(
-        "flex w-full mb-6",
-        isUser ? "justify-end" : "justify-start"
-      )}
-    >
-      <div className={cn("flex max-w-[85%] items-end gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
-        
+    <div className={cn("mb-6 flex w-full", isUser ? "justify-end" : "justify-start")}>
+      <div className={cn("flex max-w-[88%] items-end gap-2", isUser ? "flex-row-reverse" : "flex-row")}>
         <div className={cn(
-          "flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center border",
-          isUser 
-            ? "bg-secondary border-border" 
-            : "bg-primary/10 border-primary/30 text-primary"
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border shadow-sm",
+          isUser ? "border-border bg-secondary text-muted-foreground" : "border-primary/30 bg-primary/10 text-primary"
         )}>
-          {isUser ? <User className="w-4 h-4 text-muted-foreground" /> : <Bot className="w-4 h-4" />}
-        </div>
-        
-        <div className={cn(
-          "px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap shadow-sm",
-          isUser 
-            ? "bg-primary text-primary-foreground rounded-br-sm" 
-            : "bg-card border border-border text-card-foreground rounded-bl-sm"
-        )}>
-          {message.content}
-          {message.isStreaming && (
-            <span className="inline-block w-1.5 h-4 ml-1 bg-primary align-middle animate-pulse" />
-          )}
+          {isUser ? <User className="h-4 w-4" /> : <DnaMark />}
         </div>
 
+        <div className={cn(
+          "relative overflow-hidden rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-sm",
+          isUser
+            ? "rounded-br-md bg-primary text-primary-foreground"
+            : "rounded-bl-md border border-border bg-card text-card-foreground"
+        )}>
+          {!isUser && <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/70 to-transparent" />}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {message.attachments.map((attachment) => (
+                <AttachmentPill key={attachment.id} name={attachment.name} kind={attachment.kind} />
+              ))}
+            </div>
+          )}
+          <div className="whitespace-pre-wrap">{message.content}</div>
+          {message.isStreaming && (
+            <span className="typing-dots ml-2 inline-flex align-middle">
+              <span />
+              <span />
+              <span />
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
