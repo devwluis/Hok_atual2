@@ -84,9 +84,15 @@ export default function ChatPage() {
     clearChat,
     engineConfig,
     setEngineConfig,
+    hokConfig,
+    setHokConfig,
     connectionStatus,
     connectionError,
+    hokTunnelStatus,
+    openrouterStatus,
     testConnection,
+    testHokTunnel,
+    validateOpenrouterKey,
   } = useChat();
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -164,6 +170,12 @@ export default function ChatPage() {
               connectionStatus={connectionStatus}
               connectionError={connectionError}
               testConnection={testConnection}
+              hokConfig={hokConfig}
+              setHokConfig={setHokConfig}
+              hokTunnelStatus={hokTunnelStatus}
+              openrouterStatus={openrouterStatus}
+              testHokTunnel={testHokTunnel}
+              validateOpenrouterKey={validateOpenrouterKey}
             />
           </div>
         </header>
