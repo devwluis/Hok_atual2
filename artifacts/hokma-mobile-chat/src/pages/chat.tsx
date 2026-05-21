@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Bot, Braces, Check, Cpu, Eye, EyeOff, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, Terminal, UploadCloud, Zap } from "lucide-react";
+import { Bot, Braces, Check, ChevronDown, Cpu, Eye, EyeOff, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, Terminal, UploadCloud, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function HokmaLogo({ size = "md" }: { size?: "sm" | "md" }) {
@@ -25,6 +25,103 @@ function HokmaLogo({ size = "md" }: { size?: "sm" | "md" }) {
         <h1 className={cn("font-bold tracking-tight", size === "sm" ? "text-base" : "text-lg")}>Hokmá AI Agent</h1>
       </div>
     </div>
+  );
+}
+
+function QuickModelSwitcher({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const current = MODEL_OPTIONS.find((m) => m.id === value) || MODEL_OPTIONS[0];
+  const hokModels = MODEL_OPTIONS.filter((m) => !m.id.includes("/"));
+  const orModels = MODEL_OPTIONS.filter((m) => m.id.includes("/"));
+  const isOr = current.id.includes("/");
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button
+          variant="ghost"
+          className={cn(
+            "h-9 max-w-[108px] gap-1 rounded-full border bg-card/70 px-2.5 text-[11px] font-medium",
+            isOr ? "border-violet-400/40 text-violet-300" : "border-primary/30 text-primary"
+          )}
+        >
+          <Cpu className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{current.label}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        </Button>
+      </SheetTrigger>
+
+      <SheetContent side="bottom" className="max-h-[80dvh] rounded-t-3xl border-border bg-card p-0">
+        <div className="sticky top-0 rounded-t-3xl bg-card px-4 pb-3 pt-4">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <Cpu className="h-4 w-4 text-primary" />
+            Selecionar modelo
+          </SheetTitle>
+          <SheetDescription className="text-xs">Cerebro para este chat — mude a qualquer momento</SheetDescription>
+        </div>
+
+        <div className="overflow-y-auto px-4 pb-8 space-y-5">
+          {/* HOK / DeepSeek group */}
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">HOK / DeepSeek (via Termux)</p>
+            </div>
+            <div className="space-y-1.5">
+              {hokModels.map((model) => (
+                <button
+                  key={model.id}
+                  onClick={() => { onChange(model.id); setOpen(false); }}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-2xl border p-3 text-left text-sm transition-all active:scale-[0.98]",
+                    value === model.id ? "border-amber-400/40 bg-amber-400/10" : "border-border bg-secondary/30 hover:border-amber-400/30"
+                  )}
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-400/10">
+                    <img src="/hokma-logo.png" alt="" className="h-6 w-6 rounded-lg object-cover" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold leading-tight">{model.label}</p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{model.description}</p>
+                  </div>
+                  {value === model.id && <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* OpenRouter group */}
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">OpenRouter (requer chave API)</p>
+            </div>
+            <div className="space-y-1.5">
+              {orModels.map((model) => (
+                <button
+                  key={model.id}
+                  onClick={() => { onChange(model.id); setOpen(false); }}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-2xl border p-3 text-left text-sm transition-all active:scale-[0.98]",
+                    value === model.id ? "border-violet-400/40 bg-violet-400/10" : "border-border bg-secondary/30 hover:border-violet-400/30"
+                  )}
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-400">
+                    <Network className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold leading-tight">{model.label}</p>
+                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{model.provider}</p>
+                  </div>
+                  {value === model.id && <span className="h-2 w-2 shrink-0 rounded-full bg-violet-400" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -170,6 +267,10 @@ export default function ChatPage() {
               </SheetContent>
             </Sheet>
             <AgentSwitcher activeAgent={activeAgent} setActiveAgent={setActiveAgent} />
+            <QuickModelSwitcher
+              value={engineConfig.model}
+              onChange={(model) => setEngineConfig({ ...engineConfig, model })}
+            />
           </div>
 
           <div className="flex items-center gap-2">
