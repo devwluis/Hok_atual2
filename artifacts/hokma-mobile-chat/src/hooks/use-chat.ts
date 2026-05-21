@@ -17,6 +17,7 @@ export type Message = {
   timestamp: Date;
   isStreaming?: boolean;
   attachments?: Attachment[];
+  routedVia?: "hok" | "openrouter" | "hokclaw" | "preview";
 };
 
 export type Agent = {
@@ -44,11 +45,24 @@ export type EngineConfig = {
   apiKey: string;
 };
 
+export type HokConfig = {
+  hokUrl: string;
+  hokToken: string;
+  openrouterKey: string;
+};
+
 export type ConnectionStatus = "idle" | "online" | "offline" | "testing";
 
 const STORE_KEY = "hokma_mobile_engine_config";
 const MESSAGES_STORE_KEY = "hokma_mobile_messages";
+const HOK_CONFIG_KEY = "hokma_hok_config";
 const PHONE_IP_ENDPOINT = "http://10.168.212.48:18800/v1/chat/completions";
+
+const DEFAULT_HOK_CONFIG: HokConfig = {
+  hokUrl: "http://bore.pub:35798/hok",
+  hokToken: "W@sh1ngt0nJarvis2026#",
+  openrouterKey: "",
+};
 
 export const MODEL_OPTIONS: ModelOption[] = [
   { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", provider: "Groq/HokClaw", description: "Rapido para chat local" },
@@ -91,6 +105,20 @@ function loadEngineConfig(): EngineConfig {
 
 function saveEngineConfig(config: EngineConfig) {
   localStorage.setItem(STORE_KEY, JSON.stringify(config));
+}
+
+function loadHokConfig(): HokConfig {
+  try {
+    const raw = localStorage.getItem(HOK_CONFIG_KEY);
+    if (!raw) return DEFAULT_HOK_CONFIG;
+    return { ...DEFAULT_HOK_CONFIG, ...JSON.parse(raw) };
+  } catch {
+    return DEFAULT_HOK_CONFIG;
+  }
+}
+
+function saveHokConfig(config: HokConfig) {
+  localStorage.setItem(HOK_CONFIG_KEY, JSON.stringify(config));
 }
 
 function normalizeChatEndpoint(endpoint: string) {
@@ -144,6 +172,72 @@ async function streamPreviewResponse(
   }
 }
 
+// HOK Tunnel: texto → bore.pub orquestrador → DeepSeek
+async function enviarComandoAoHok(promptTexto: string, config: HokConfig): Promise<string> {
+  const url = config.hokUrl.trim() || DEFAULT_HOK_CONFIG.hokUrl;
+  const token = config.hokToken.trim() || DEFAULT_HOK_CONFIG.hokToken;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-HOK-TOKEN": token,
+    },
+    body: JSON.stringify({ message: promptTexto }),
+  });
+  if (!response.ok) {
+    throw new Error(`HOK Tunnel retornou HTTP ${response.status}`);
+  }
+  const data = await response.json() as { reply?: string };
+  return data.reply ?? "O orquestrador HOK respondeu sem conteudo.";
+}
+
+// OpenRouter Vision: imagem → GPT-4o-mini
+async function analisarImagemOpenRouter(
+  prompt: string,
+  imageDataUrl: string,
+  agent: Agent,
+  openrouterKey: string,
+): Promise<string> {
+  const base64 = imageDataUrl.split(",")[1] ?? imageDataUrl;
+  const mimeMatch = imageDataUrl.match(/^data:(image\/[^;]+);base64,/);
+  const mimeType = mimeMatch?.[1] ?? "image/jpeg";
+
+  const systemPrompt = `Voce e o cerebro visual do ecossistema HOK. Analise a imagem de interface/codigo/diagrama enviada pelo celular e responda de forma estruturada em portugues. Agente ativo: ${agent.name} — ${agent.description}.`;
+
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openrouterKey}`,
+      "HTTP-Referer": "https://hokma.app",
+      "X-Title": "HokClaw AI Agent",
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt || "Analise esta imagem e descreva o que voce ve." },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } },
+          ],
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 1800,
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await response.text().catch(() => "");
+    throw new Error(`OpenRouter HTTP ${response.status}${err ? `: ${err.slice(0, 160)}` : ""}`);
+  }
+
+  const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+  return data.choices?.[0]?.message?.content ?? "OpenRouter respondeu sem conteudo.";
+}
+
 function createWelcomeMessage(): Message {
   return {
     id: "welcome",
@@ -190,8 +284,11 @@ export function useChat() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeAgent, setActiveAgent] = useState<Agent>(AGENTS[0]);
   const [engineConfig, setEngineConfigState] = useState<EngineConfig>(() => loadEngineConfig());
+  const [hokConfig, setHokConfigState] = useState<HokConfig>(() => loadHokConfig());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [connectionError, setConnectionError] = useState("");
+  const [hokTunnelStatus, setHokTunnelStatus] = useState<ConnectionStatus>("idle");
+  const [openrouterStatus, setOpenrouterStatus] = useState<ConnectionStatus>("idle");
 
   const updateAssistantMessage = useCallback((messageId: string, content: string) => {
     setMessages((prev) =>
@@ -217,6 +314,33 @@ export function useChat() {
     setEngineConfigState(normalized);
     setConnectionStatus("idle");
     setConnectionError("");
+  }, []);
+
+  const setHokConfig = useCallback((config: HokConfig) => {
+    saveHokConfig(config);
+    setHokConfigState(config);
+    setHokTunnelStatus("idle");
+    setOpenrouterStatus(config.openrouterKey.trim() ? "idle" : "offline");
+  }, []);
+
+  const testHokTunnel = useCallback(async (config: HokConfig) => {
+    setHokTunnelStatus("testing");
+    try {
+      const reply = await enviarComandoAoHok("ping", config);
+      setHokTunnelStatus(reply ? "online" : "offline");
+      return !!reply;
+    } catch {
+      setHokTunnelStatus("offline");
+      return false;
+    }
+  }, []);
+
+  const validateOpenrouterKey = useCallback((config: HokConfig) => {
+    if (config.openrouterKey.trim().length > 10) {
+      setOpenrouterStatus("online");
+    } else {
+      setOpenrouterStatus("offline");
+    }
   }, []);
 
   const sendMessage = useCallback(async (content: string, attachments: Attachment[] = []) => {
@@ -252,15 +376,51 @@ export function useChat() {
     ]);
 
     try {
-      if (engineConfig.mode === "preview") {
-        const filesLine = attachments.length ? `\n\nArquivos recebidos: ${attachments.map((file) => file.name).join(", ")}. Vou tratar textos como contexto e imagens/binarios como referencias ate o servidor de visao estar ativo.` : "";
-        const responseText = `Agente ${activeAgent.name} usando ${engineConfig.model}.\n\nComando recebido: "${messageContent}".${filesLine}\n\nResposta em modo previa: o fluxo esta pronto para usar HokClaw como cerebro, alternar modelos gratuitos e interpretar anexos quando o backend expuser essa capacidade.`;
+      const imageAttachments = attachments.filter((a) => a.kind === "image" && a.dataUrl);
+      const hokUrlConfigured = hokConfig.hokUrl.trim().length > 0;
+
+      // ROTA A: imagem presente + chave OpenRouter configurada → visão GPT-4o-mini
+      if (imageAttachments.length > 0 && hokConfig.openrouterKey.trim()) {
+        setOpenrouterStatus("testing");
+        const firstImage = imageAttachments[0];
+        const reply = await analisarImagemOpenRouter(
+          messageContent,
+          firstImage.dataUrl!,
+          activeAgent,
+          hokConfig.openrouterKey.trim(),
+        );
+        setOpenrouterStatus("online");
+        setMessages(prev => prev.map(msg =>
+          msg.id === astMsgId ? { ...msg, routedVia: "openrouter" } : msg
+        ));
+        updateAssistantMessage(astMsgId, reply);
+      }
+      // ROTA B: texto puro + túnel HOK configurado → bore.pub orquestrador
+      else if (!imageAttachments.length && hokUrlConfigured && engineConfig.mode !== "preview") {
+        setHokTunnelStatus("testing");
+        const reply = await enviarComandoAoHok(promptContent, hokConfig);
+        setHokTunnelStatus("online");
+        setMessages(prev => prev.map(msg =>
+          msg.id === astMsgId ? { ...msg, routedVia: "hok" } : msg
+        ));
+        updateAssistantMessage(astMsgId, reply);
+      }
+      // ROTA C: modo previa simulado
+      else if (engineConfig.mode === "preview") {
+        const filesLine = attachments.length
+          ? `\n\nArquivos recebidos: ${attachments.map((f) => f.name).join(", ")}. Imagens e textos serao tratados conforme o cerebro ativo.`
+          : "";
+        const responseText = `Agente ${activeAgent.name} usando ${engineConfig.model}.\n\nComando recebido: "${messageContent}".${filesLine}\n\nResposta em modo previa: fluxo pronto para usar HOK Tunnel, OpenRouter Visao ou HokClaw local como cerebro.`;
         await streamPreviewResponse(responseText, astMsgId, updateAssistantMessage);
-      } else {
+        setMessages(prev => prev.map(msg =>
+          msg.id === astMsgId ? { ...msg, routedVia: "preview" } : msg
+        ));
+      }
+      // ROTA D: HokClaw local direto (OpenAI-compatible)
+      else {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
         };
-
         if (engineConfig.apiKey.trim()) {
           headers.Authorization = `Bearer ${engineConfig.apiKey.trim()}`;
         }
@@ -271,7 +431,9 @@ export function useChat() {
           .slice(-40)
           .map((message) => ({
             role: message.role === "assistant" ? "assistant" : "user",
-            content: message.attachments?.length ? `${message.content}\n\nContexto dos anexos:\n${formatAttachmentsForPrompt(message.attachments)}` : message.content,
+            content: message.attachments?.length
+              ? `${message.content}\n\nContexto dos anexos:\n${formatAttachmentsForPrompt(message.attachments)}`
+              : message.content,
           }));
 
         const endpoint = normalizeChatEndpoint(engineConfig.endpoint);
@@ -301,7 +463,7 @@ export function useChat() {
 
         const contentType = response.headers.get("content-type") || "";
         if (!response.body || !contentType.includes("text/event-stream")) {
-          const data = await response.json();
+          const data = await response.json() as { choices?: { message?: { content?: string } }[]; message?: string; content?: string };
           const reply = data.choices?.[0]?.message?.content || data.message || data.content || JSON.stringify(data);
           updateAssistantMessage(astMsgId, reply);
         } else {
@@ -321,7 +483,9 @@ export function useChat() {
               if (!trimmed || trimmed === "data: [DONE]" || !trimmed.startsWith("data:")) continue;
 
               try {
-                const parsed = JSON.parse(trimmed.replace(/^data:\s*/, ""));
+                const parsed = JSON.parse(trimmed.replace(/^data:\s*/, "")) as {
+                  choices?: { delta?: { content?: string }; message?: { content?: string } }[];
+                };
                 const delta = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.message?.content || "";
                 if (delta) {
                   accumulated += delta;
@@ -337,15 +501,24 @@ export function useChat() {
             updateAssistantMessage(astMsgId, "O motor respondeu sem conteudo. Verifique o modelo ou o servidor HokClaw.");
           }
         }
+
+        setMessages(prev => prev.map(msg =>
+          msg.id === astMsgId ? { ...msg, routedVia: "hokclaw" } : msg
+        ));
       }
     } catch (error) {
-      setConnectionStatus("offline");
+      const isHokRoute = hokConfig.hokUrl.trim().length > 0 && attachments.filter((a) => a.kind === "image").length === 0;
+      if (isHokRoute) {
+        setHokTunnelStatus("offline");
+      } else {
+        setConnectionStatus("offline");
+      }
       const endpoint = normalizeChatEndpoint(engineConfig.endpoint);
       const message = getConnectionErrorMessage(error, endpoint);
       setConnectionError(message);
       updateAssistantMessage(
         astMsgId,
-        `Nao consegui conectar ao motor configurado.\n\nEndpoint: ${endpoint}\nModelo: ${engineConfig.model}\n\nDetalhe: ${message}\n\nSe continuar falhando, confirme se o HokClaw esta ouvindo em 0.0.0.0:18800 e com CORS liberado para o Chrome.`,
+        `Nao consegui conectar ao motor configurado.\n\nDetalhe: ${message}\n\nVerifique se o HOK Orquestrador esta ativo no Termux e se a URL do tunel esta correta nas configuracoes.`,
       );
     } finally {
       setMessages(prev =>
@@ -358,7 +531,7 @@ export function useChat() {
 
       setIsStreaming(false);
     }
-  }, [activeAgent, engineConfig, messages, updateAssistantMessage]);
+  }, [activeAgent, engineConfig, hokConfig, messages, updateAssistantMessage]);
 
   const testConnection = useCallback(async (overrideConfig?: EngineConfig) => {
     const config = overrideConfig ? {
@@ -421,14 +594,20 @@ export function useChat() {
     input,
     setInput,
     isStreaming,
-    sendMessage,
     activeAgent,
     setActiveAgent,
-    clearChat,
     engineConfig,
     setEngineConfig,
+    hokConfig,
+    setHokConfig,
     connectionStatus,
     connectionError,
+    hokTunnelStatus,
+    openrouterStatus,
     testConnection,
+    testHokTunnel,
+    validateOpenrouterKey,
+    sendMessage,
+    clearChat,
   };
 }
