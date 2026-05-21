@@ -49,6 +49,7 @@ export type HokConfig = {
   hokUrl: string;
   hokToken: string;
   openrouterKey: string;
+  hokBackendUrl: string;
 };
 
 export type ConnectionStatus = "idle" | "online" | "offline" | "testing";
@@ -62,16 +63,26 @@ const DEFAULT_HOK_CONFIG: HokConfig = {
   hokUrl: "http://bore.pub:35798/hok",
   hokToken: "W@sh1ngt0nJarvis2026#",
   openrouterKey: "",
+  hokBackendUrl: "",
 };
 
 export const MODEL_OPTIONS: ModelOption[] = [
-  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B", provider: "Groq/HokClaw", description: "Rapido para chat local" },
-  { id: "gemini-1.5-flash", label: "Gemini Flash", provider: "Google", description: "Rapido e multimodal" },
-  { id: "gemini-1.5-pro", label: "Gemini Pro", provider: "Google", description: "Raciocinio mais forte" },
-  { id: "gpt-5-mini", label: "GPT-5 Mini", provider: "OpenAI", description: "Geral e economico" },
-  { id: "gpt-5-nano", label: "GPT-5 Nano", provider: "OpenAI", description: "Baixa latencia" },
-  { id: "qwen/qwen3-coder:free", label: "Qwen Coder Free", provider: "OpenRouter", description: "Codigo e agentes" },
-  { id: "anthropic/claude-3-haiku", label: "Claude Haiku", provider: "Anthropic", description: "Analise objetiva" },
+  // ── HOK Tunnel / Backend (DeepSeek via Termux)
+  { id: "deepseek-chat",     label: "DeepSeek V3",          provider: "HOK → DeepSeek",   description: "Melhor chat pago DeepSeek" },
+  { id: "deepseek-reasoner", label: "DeepSeek R1",          provider: "HOK → DeepSeek",   description: "Raciocinio avancado DeepSeek" },
+  { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B",     provider: "HOK → Groq",       description: "Rapido e local" },
+  // ── OpenRouter (requer chave openrouter.ai)
+  { id: "openai/gpt-4o-mini",                    label: "GPT-4o Mini",          provider: "OpenRouter → OpenAI",      description: "Economico e multimodal" },
+  { id: "openai/gpt-4o",                         label: "GPT-4o",               provider: "OpenRouter → OpenAI",      description: "Maior modelo OpenAI" },
+  { id: "anthropic/claude-3.5-sonnet",           label: "Claude 3.5 Sonnet",    provider: "OpenRouter → Anthropic",   description: "Melhor Claude para codigo" },
+  { id: "anthropic/claude-3-haiku",              label: "Claude 3 Haiku",       provider: "OpenRouter → Anthropic",   description: "Rapido e objetivo" },
+  { id: "google/gemini-2.0-flash-exp:free",      label: "Gemini 2.0 Flash",     provider: "OpenRouter → Google",      description: "Gratis e multimodal" },
+  { id: "google/gemini-2.5-pro-preview-06-05",   label: "Gemini 2.5 Pro",       provider: "OpenRouter → Google",      description: "Pro Google atualizado" },
+  { id: "meta-llama/llama-3.3-70b-instruct",     label: "Llama 3.3 70B",        provider: "OpenRouter → Meta",        description: "Open source poderoso" },
+  { id: "deepseek/deepseek-chat-v3-0324:free",   label: "DeepSeek V3 (OR Free)", provider: "OpenRouter → DeepSeek",  description: "Gratis via OpenRouter" },
+  { id: "deepseek/deepseek-r1:free",             label: "DeepSeek R1 (OR Free)", provider: "OpenRouter → DeepSeek",  description: "Raciocinio gratis" },
+  { id: "qwen/qwen-2.5-72b-instruct",            label: "Qwen 2.5 72B",         provider: "OpenRouter → Qwen",        description: "Codigo e multilingual" },
+  { id: "mistralai/mistral-large",               label: "Mistral Large",         provider: "OpenRouter → Mistral",    description: "Europeu e eficiente" },
 ];
 
 const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -189,6 +200,44 @@ async function enviarComandoAoHok(promptTexto: string, config: HokConfig): Promi
   }
   const data = await response.json() as { reply?: string };
   return data.reply ?? "O orquestrador HOK respondeu sem conteudo.";
+}
+
+// Detecta se um model id é rota OpenRouter (contém "/")
+function isOpenRouterModel(modelId: string) {
+  return modelId.includes("/");
+}
+
+// OpenRouter Texto: qualquer modelo OpenRouter com chave configurada
+async function enviarTextoOpenRouter(
+  prompt: string,
+  modelId: string,
+  agent: Agent,
+  openrouterKey: string,
+): Promise<string> {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${openrouterKey}`,
+      "HTTP-Referer": "https://hokma.app",
+      "X-Title": "Hokmá AI Agent",
+    },
+    body: JSON.stringify({
+      model: modelId,
+      messages: [
+        { role: "system", content: getSystemPrompt(agent) },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 2400,
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.text().catch(() => "");
+    throw new Error(`OpenRouter HTTP ${response.status}${err ? `: ${err.slice(0, 160)}` : ""}`);
+  }
+  const data = await response.json() as { choices?: { message?: { content?: string } }[] };
+  return data.choices?.[0]?.message?.content ?? "OpenRouter respondeu sem conteudo.";
 }
 
 // OpenRouter Vision: imagem → GPT-4o-mini
@@ -379,15 +428,18 @@ export function useChat() {
       const imageAttachments = attachments.filter((a) => a.kind === "image" && a.dataUrl);
       const hokUrlConfigured = hokConfig.hokUrl.trim().length > 0;
 
-      // ROTA A: imagem presente + chave OpenRouter configurada → visão GPT-4o-mini
-      if (imageAttachments.length > 0 && hokConfig.openrouterKey.trim()) {
+      const orKey = hokConfig.openrouterKey.trim();
+      const useOrModel = isOpenRouterModel(engineConfig.model);
+
+      // ROTA A: imagem presente + chave OpenRouter → visão GPT-4o-mini
+      if (imageAttachments.length > 0 && orKey) {
         setOpenrouterStatus("testing");
         const firstImage = imageAttachments[0];
         const reply = await analisarImagemOpenRouter(
           messageContent,
           firstImage.dataUrl!,
           activeAgent,
-          hokConfig.openrouterKey.trim(),
+          orKey,
         );
         setOpenrouterStatus("online");
         setMessages(prev => prev.map(msg =>
@@ -395,7 +447,17 @@ export function useChat() {
         ));
         updateAssistantMessage(astMsgId, reply);
       }
-      // ROTA B: texto puro + túnel HOK configurado → bore.pub orquestrador
+      // ROTA B: modelo OpenRouter selecionado + chave presente → OpenRouter texto
+      else if (useOrModel && orKey && engineConfig.mode !== "preview") {
+        setOpenrouterStatus("testing");
+        const reply = await enviarTextoOpenRouter(promptContent, engineConfig.model, activeAgent, orKey);
+        setOpenrouterStatus("online");
+        setMessages(prev => prev.map(msg =>
+          msg.id === astMsgId ? { ...msg, routedVia: "openrouter" } : msg
+        ));
+        updateAssistantMessage(astMsgId, reply);
+      }
+      // ROTA C: texto puro + túnel HOK configurado → bore.pub orquestrador → DeepSeek
       else if (!imageAttachments.length && hokUrlConfigured && engineConfig.mode !== "preview") {
         setHokTunnelStatus("testing");
         const reply = await enviarComandoAoHok(promptContent, hokConfig);
@@ -405,18 +467,19 @@ export function useChat() {
         ));
         updateAssistantMessage(astMsgId, reply);
       }
-      // ROTA C: modo previa simulado
+      // ROTA D: modo previa simulado
       else if (engineConfig.mode === "preview") {
         const filesLine = attachments.length
           ? `\n\nArquivos recebidos: ${attachments.map((f) => f.name).join(", ")}. Imagens e textos serao tratados conforme o cerebro ativo.`
           : "";
-        const responseText = `Agente ${activeAgent.name} usando ${engineConfig.model}.\n\nComando recebido: "${messageContent}".${filesLine}\n\nResposta em modo previa: fluxo pronto para usar HOK Tunnel, OpenRouter Visao ou HokClaw local como cerebro.`;
+        const modelLabel = MODEL_OPTIONS.find((m) => m.id === engineConfig.model)?.label ?? engineConfig.model;
+        const responseText = `Agente ${activeAgent.name} usando ${modelLabel}.\n\nComando recebido: "${messageContent}".${filesLine}\n\nResposta em modo previa: fluxo pronto para usar HOK Tunnel, OpenRouter ou Hokmá local como cerebro.`;
         await streamPreviewResponse(responseText, astMsgId, updateAssistantMessage);
         setMessages(prev => prev.map(msg =>
           msg.id === astMsgId ? { ...msg, routedVia: "preview" } : msg
         ));
       }
-      // ROTA D: HokClaw local direto (OpenAI-compatible)
+      // ROTA E: Hokmá Backend direto (hokBackendUrl) ou local (OpenAI-compatible)
       else {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -436,7 +499,9 @@ export function useChat() {
               : message.content,
           }));
 
-        const endpoint = normalizeChatEndpoint(engineConfig.endpoint);
+        // Prefer hokBackendUrl (direct backend) over generic endpoint
+        const backendBase = hokConfig.hokBackendUrl.trim() || engineConfig.endpoint;
+        const endpoint = normalizeChatEndpoint(backendBase);
         const response = await fetch(endpoint, {
           method: "POST",
           headers,
