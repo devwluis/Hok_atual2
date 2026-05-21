@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { Send, Mic, Paperclip, X, FileText, Archive, ImageIcon } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { Send, Mic, MicOff, Paperclip, X, FileText, Archive, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Attachment } from "@/hooks/use-chat";
 
@@ -8,6 +8,28 @@ interface ChatInputProps {
   setInput: (value: string) => void;
   onSend: (value: string, attachments?: Attachment[]) => void;
   isStreaming: boolean;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  results: { [index: number]: { [index: number]: { transcript: string }; isFinal: boolean }; length: number };
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onend: (() => void) | null;
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+function getSpeechRecognition(): SpeechRecognitionConstructor | null {
+  const w = window as unknown as { SpeechRecognition?: SpeechRecognitionConstructor; webkitSpeechRecognition?: SpeechRecognitionConstructor };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
 const TEXT_TYPES = ["text/", "application/json", "application/javascript", "application/typescript", "application/xml", "text/css"];
@@ -74,8 +96,13 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isReading, setIsReading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSupported] = useState(() => getSpeechRecognition() !== null);
+  const [voiceError, setVoiceError] = useState("");
+  const [interimText, setInterimText] = useState("");
 
   const removeAttachment = (id: string) => setAttachments((items) => items.filter((item) => item.id !== id));
 
@@ -134,8 +161,79 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) =>
     processFiles(Array.from(e.target.files || []));
 
+  const stopListening = () => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setIsListening(false);
+    setInterimText("");
+  };
+
+  const startListening = () => {
+    const SR = getSpeechRecognition();
+    if (!SR) return;
+    setVoiceError("");
+    setInterimText("");
+
+    const recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "pt-BR";
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      let final = "";
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0].transcript;
+        if (result.isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      if (final) {
+        setInput((prev) => (prev ? prev + " " + final.trim() : final.trim()));
+        setInterimText("");
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 132)}px`;
+        }
+      } else {
+        setInterimText(interim);
+      }
+    };
+
+    recognition.onerror = () => {
+      setVoiceError("Microfone nao autorizado ou indisponivel");
+      stopListening();
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimText("");
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
+
+  const toggleVoice = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  useEffect(() => {
+    return () => { recognitionRef.current?.stop(); };
+  }, []);
+
   const imageAttachments = attachments.filter((a) => a.kind === "image");
   const otherAttachments = attachments.filter((a) => a.kind !== "image");
+
+  const hasContent = input.trim() || attachments.length > 0;
 
   return (
     <div className="sticky bottom-0 z-20 border-t border-border/70 bg-background/85 px-3 py-3 backdrop-blur-2xl">
@@ -150,13 +248,26 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
           </div>
         )}
 
-        {/* File chips (non-image) */}
+        {/* File chips */}
         {otherAttachments.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {otherAttachments.map((att) => (
               <FileChip key={att.id} attachment={att} onRemove={() => removeAttachment(att.id)} />
             ))}
           </div>
+        )}
+
+        {/* Voice interim text */}
+        {interimText && (
+          <div className="flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+            <span className="italic">{interimText}</span>
+          </div>
+        )}
+
+        {/* Voice error */}
+        {voiceError && (
+          <p className="px-1 text-[11px] text-red-400">{voiceError}</p>
         )}
 
         <div className="flex items-end gap-2 rounded-[1.7rem] border border-border bg-card/95 p-2 shadow-[0_20px_60px_rgba(15,23,42,0.16)] dark:shadow-[0_20px_70px_rgba(0,255,255,0.08)]">
@@ -209,13 +320,20 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={isReading ? "Lendo arquivos..." : "Ask Hokmá..."}
+            placeholder={
+              isListening
+                ? "Ouvindo... fale agora"
+                : isReading
+                  ? "Lendo arquivos..."
+                  : "Ask Hokmá..."
+            }
             className="max-h-[132px] min-h-[42px] flex-1 resize-none bg-transparent px-1 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
             disabled={isStreaming || isReading}
           />
 
-          {input.trim() || attachments.length ? (
+          {/* Send OR Mic/Stop */}
+          {hasContent ? (
             <Button
               type="submit"
               disabled={isStreaming || isReading}
@@ -224,12 +342,30 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
             >
               <Send className="ml-0.5 h-4 w-4" />
             </Button>
+          ) : voiceSupported ? (
+            <Button
+              type="button"
+              variant={isListening ? "destructive" : "secondary"}
+              size="icon"
+              onClick={toggleVoice}
+              disabled={isStreaming}
+              className={
+                isListening
+                  ? "h-10 w-10 shrink-0 animate-pulse rounded-full bg-red-500 text-white shadow-lg shadow-red-500/30 hover:bg-red-600"
+                  : "h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-primary"
+              }
+              title={isListening ? "Parar gravacao" : "Falar por voz (pt-BR)"}
+            >
+              {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
           ) : (
             <Button
               type="button"
               variant="secondary"
               size="icon"
-              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+              disabled
+              className="h-10 w-10 shrink-0 rounded-full text-muted-foreground/40"
+              title="Voz nao suportada neste navegador"
             >
               <Mic className="h-5 w-5" />
             </Button>
