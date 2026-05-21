@@ -183,6 +183,15 @@ async function streamPreviewResponse(
   }
 }
 
+// Ping leve: GET /ping na raiz do servidor HOK (sem token, sem DeepSeek)
+async function pingHokServer(hokUrl: string): Promise<boolean> {
+  const base = hokUrl.trim().replace(/\/hok\/?$/, "").replace(/\/$/, "");
+  const response = await fetch(`${base}/ping`, { method: "GET" });
+  if (!response.ok) return false;
+  const data = await response.json() as { status?: string };
+  return data.status === "online";
+}
+
 // HOK Tunnel: texto → bore.pub orquestrador → DeepSeek
 async function enviarComandoAoHok(promptTexto: string, config: HokConfig): Promise<string> {
   const url = config.hokUrl.trim() || DEFAULT_HOK_CONFIG.hokUrl;
@@ -375,9 +384,10 @@ export function useChat() {
   const testHokTunnel = useCallback(async (config: HokConfig) => {
     setHokTunnelStatus("testing");
     try {
-      const reply = await enviarComandoAoHok("ping", config);
-      setHokTunnelStatus(reply ? "online" : "offline");
-      return !!reply;
+      const hokUrl = config.hokUrl.trim() || DEFAULT_HOK_CONFIG.hokUrl;
+      const ok = await pingHokServer(hokUrl);
+      setHokTunnelStatus(ok ? "online" : "offline");
+      return ok;
     } catch {
       setHokTunnelStatus("offline");
       return false;
