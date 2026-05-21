@@ -224,12 +224,12 @@ export default function DashboardPage() {
             <div className="absolute right-[-70px] top-[-80px] h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
             <div className="relative z-10 space-y-5">
               <div className="flex items-center gap-4">
-                <div className="dna-orbit" />
+                <img src="/hokma-logo.png" alt="Hokmá" className="h-12 w-12 rounded-2xl object-cover border border-primary/20 shadow-lg shadow-primary/10" />
                 <div>
-                  <p className="font-mono text-xs uppercase tracking-[0.3em] text-primary">Hok Control HUD</p>
+                  <p className="font-mono text-xs uppercase tracking-[0.3em] text-primary">Hokmá Control HUD</p>
                   <h1 className="text-3xl font-bold tracking-[-0.07em]">Painel de ordens</h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {hokActive ? `Via HOK Tunnel · ${hokConfig.hokUrl.replace("http://", "").split("/")[0]}` : "Via HokClaw local"}
+                    {hokActive ? `Via HOK Tunnel · ${hokConfig.hokUrl.replace("http://", "").split("/")[0]}` : "Via Hokmá local"}
                   </p>
                 </div>
               </div>

@@ -7,13 +7,9 @@ interface ChatMessageProps {
   message: Message;
 }
 
-function DnaMark() {
+function HokmaAvatar() {
   return (
-    <div className="dna-mark-small">
-      <span />
-      <span />
-      <span />
-    </div>
+    <img src="/hokma-logo.png" alt="Hokmá" className="h-full w-full rounded-2xl object-cover" />
   );
 }
 
@@ -55,7 +51,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           "flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border shadow-sm",
           isUser ? "border-border bg-secondary text-muted-foreground" : "border-primary/30 bg-primary/10 text-primary"
         )}>
-          {isUser ? <User className="h-4 w-4" /> : <DnaMark />}
+          {isUser ? <User className="h-4 w-4" /> : <HokmaAvatar />}
         </div>
 
         <div className={cn(
