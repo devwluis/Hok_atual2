@@ -9,16 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Archive, Bot, Braces, Cpu, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, Terminal, UploadCloud, Zap } from "lucide-react";
+import { Bot, Braces, Check, Cpu, Eye, EyeOff, FileText, Menu, Moon, Network, PanelLeft, Plus, Radio, ShieldCheck, Sparkles, Sun, Terminal, UploadCloud, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-function DnaLogo() {
+function HokmaLogo({ size = "md" }: { size?: "sm" | "md" }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="dna-orbit" />
+    <div className={cn("flex items-center gap-3", size === "sm" && "gap-2")}>
+      <img
+        src="/hokma-logo.png"
+        alt="Hokmá"
+        className={cn("rounded-2xl object-cover border border-primary/20 shadow-lg shadow-primary/10", size === "sm" ? "h-9 w-9" : "h-12 w-12")}
+      />
       <div>
-        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-primary">OpenClaw</p>
-        <h1 className="text-lg font-bold tracking-tight">HokClaw AI Agent</h1>
+        <p className="font-mono text-[10px] uppercase tracking-[0.32em] text-primary">Hokmá</p>
+        <h1 className={cn("font-bold tracking-tight", size === "sm" ? "text-base" : "text-lg")}>Hokmá AI Agent</h1>
       </div>
     </div>
   );
@@ -26,15 +30,14 @@ function DnaLogo() {
 
 function SidebarContent({ onNewChat }: { onNewChat: () => void }) {
   const items = [
-    { icon: Bot, title: "Chat principal", text: "HokClaw como cerebro" },
+    { icon: Bot, title: "Chat principal", text: "Hokmá como cerebro" },
     { icon: FileText, title: "Leitura de arquivos", text: "txt, codigo, json, csv" },
-    { icon: Archive, title: "Pacotes e zip", text: "referencia para backend" },
     { icon: Network, title: "Automacao", text: "Termux, PC e mobile" },
   ];
 
   return (
     <div className="flex h-full flex-col gap-5">
-      <DnaLogo />
+      <HokmaLogo />
       <Button onClick={onNewChat} className="h-11 justify-start gap-2 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/20">
         <Plus className="h-4 w-4" />
         Novo chat
@@ -42,7 +45,7 @@ function SidebarContent({ onNewChat }: { onNewChat: () => void }) {
       <Link href="/dashboard">
         <Button variant="outline" className="h-11 w-full justify-start gap-2 rounded-2xl">
           <Terminal className="h-4 w-4" />
-          Dashboard Hok
+          Dashboard Hokmá
         </Button>
       </Link>
       <div className="space-y-2">
@@ -66,7 +69,7 @@ function SidebarContent({ onNewChat }: { onNewChat: () => void }) {
       </div>
       <div className="mt-auto rounded-3xl border border-primary/20 bg-primary/10 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Servidor</p>
-        <p className="mt-2 text-sm leading-5 text-muted-foreground">Use HokClaw local, ngrok ou OpenClaw como roteador para modelos OpenAI, Anthropic, Gemini, Qwen e Groq.</p>
+        <p className="mt-2 text-sm leading-5 text-muted-foreground">Use o Hokmá local ou o tunel HOK como roteador para modelos DeepSeek, OpenAI, Anthropic, Gemini e Groq.</p>
       </div>
     </div>
   );
@@ -98,6 +101,12 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [theme, setTheme] = useState(() => localStorage.getItem("hokclaw_theme") || "dark");
 
+  // Login panel state
+  const [loginUrl, setLoginUrl] = useState(() => hokConfig.hokUrl);
+  const [loginToken, setLoginToken] = useState(() => hokConfig.hokToken);
+  const [showLoginToken, setShowLoginToken] = useState(false);
+  const [loginSaved, setLoginSaved] = useState(false);
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     localStorage.setItem("hokclaw_theme", theme);
@@ -119,17 +128,25 @@ export default function ChatPage() {
       ? "Offline"
       : connectionStatus === "testing"
         ? "Testando"
-        : "HokClaw";
+        : "Hokmá";
 
   const quickCommands = [
     { icon: UploadCloud, label: "Ler arquivo", cmd: "Explique como voce vai interpretar arquivos anexados e quais formatos consegue usar agora." },
-    { icon: Braces, label: "Criar codigo", cmd: "Atue como Coder e crie um plano tecnico para evoluir o HokClaw com leitura de arquivos e imagens." },
-    { icon: Zap, label: "Automacao segura", cmd: "Desenhe um fluxo seguro para controlar celular e PC usando HokClaw, com permissoes claras." },
+    { icon: Braces, label: "Criar codigo", cmd: "Atue como Coder e crie um plano tecnico para evoluir o Hokmá com leitura de arquivos e imagens." },
+    { icon: Zap, label: "Automacao segura", cmd: "Desenhe um fluxo seguro para controlar celular e PC usando o Hokmá, com permissoes claras." },
   ];
+
+  const saveLogin = () => {
+    setHokConfig({ ...hokConfig, hokUrl: loginUrl.trim(), hokToken: loginToken.trim() });
+    setLoginSaved(true);
+    setTimeout(() => setLoginSaved(false), 2000);
+  };
+
+  const hokActive = !!hokConfig.hokUrl.trim();
 
   return (
     <div className="relative flex h-[100dvh] overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.18),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(260_90%_60%/0.12),transparent_28%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.15),transparent_34%),radial-gradient(circle_at_bottom_right,hsl(30_80%_40%/0.08),transparent_28%)]" />
 
       <aside className="relative z-10 hidden w-[292px] shrink-0 border-r border-border bg-sidebar/80 p-4 text-sidebar-foreground backdrop-blur-2xl lg:block">
         <SidebarContent onNewChat={clearChat} />
@@ -146,8 +163,8 @@ export default function ChatPage() {
               </SheetTrigger>
               <SheetContent side="left" className="w-[310px] border-border bg-sidebar p-4 text-sidebar-foreground">
                 <SheetHeader className="sr-only">
-                  <SheetTitle>Menu HokClaw</SheetTitle>
-                  <SheetDescription>Navegacao e modulos do HokClaw</SheetDescription>
+                  <SheetTitle>Menu Hokmá</SheetTitle>
+                  <SheetDescription>Navegacao e modulos do Hokmá</SheetDescription>
                 </SheetHeader>
                 <SidebarContent onNewChat={clearChat} />
               </SheetContent>
@@ -183,24 +200,26 @@ export default function ChatPage() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 scroll-smooth">
           <div className="mx-auto flex min-h-full max-w-3xl flex-col">
             {!hasConversation && (
-              <section className="flex min-h-full flex-col justify-end gap-5 pb-4 pt-6">
-                <div className="glass-panel relative overflow-hidden rounded-[2rem] border border-primary/20 p-5 shadow-[0_24px_90px_rgba(8,145,178,0.16)]">
-                  <div className="absolute right-[-60px] top-[-70px] h-44 w-44 rounded-full bg-primary/20 blur-3xl" />
+              <section className="flex min-h-full flex-col justify-end gap-4 pb-4 pt-6">
+
+                {/* Hero card */}
+                <div className="glass-panel relative overflow-hidden rounded-[2rem] border border-primary/20 p-5 shadow-[0_24px_90px_hsl(var(--primary)/0.14)]">
+                  <div className="absolute right-[-60px] top-[-70px] h-44 w-44 rounded-full bg-primary/15 blur-3xl" />
                   <div className="relative z-10 space-y-5">
                     <div className="flex items-center justify-between gap-4">
-                      <DnaLogo />
+                      <HokmaLogo />
                       <div className="hidden rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-mono uppercase tracking-[0.24em] text-primary sm:block">
                         Mobile first
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <p className="font-mono text-xs uppercase tracking-[0.28em] text-primary/80">HokClaw Command Stream</p>
+                      <p className="font-mono text-xs uppercase tracking-[0.28em] text-primary/80">Hokmá Command Stream</p>
                       <h2 className="text-3xl font-semibold tracking-[-0.07em] sm:text-4xl">
                         Chat agentico para arquivos, modelos e automacao real.
                       </h2>
                       <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                        Use seu HokClaw local como cerebro, alterne agentes especializados, escolha modelos e envie arquivos de desenvolvimento ou imagens como contexto.
+                        Use o Hokmá como cerebro, alterne agentes especializados, escolha modelos e envie arquivos de desenvolvimento ou imagens como contexto.
                       </p>
                     </div>
 
@@ -222,6 +241,68 @@ export default function ChatPage() {
                   </div>
                 </div>
 
+                {/* LOGIN PANEL — Túnel + Token */}
+                <div className="rounded-[1.75rem] border border-primary/30 bg-card/80 p-4 shadow-sm backdrop-blur-xl">
+                  <div className="mb-4 flex items-center gap-3">
+                    <img src="/hokma-logo.png" alt="Hokmá" className="h-8 w-8 rounded-xl object-cover border border-primary/20" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Conexao Hokmá</p>
+                      <p className="text-xs text-muted-foreground">Configure o tunel e o token de acesso</p>
+                    </div>
+                    {hokActive && (
+                      <span className="ml-auto flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-medium text-emerald-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-[0.18em]">URL do Tunel</label>
+                      <input
+                        value={loginUrl}
+                        onChange={(e) => setLoginUrl(e.target.value)}
+                        className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                        placeholder="http://bore.pub:35798/hok"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-[0.18em]">Token Backend</label>
+                      <div className="relative">
+                        <input
+                          value={loginToken}
+                          onChange={(e) => setLoginToken(e.target.value)}
+                          type={showLoginToken ? "text" : "password"}
+                          className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 pr-10 text-sm text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/50"
+                          placeholder="X-HOK-TOKEN"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLoginToken((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showLoginToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={saveLogin}
+                      className="w-full h-11 gap-2 rounded-2xl bg-primary text-primary-foreground font-semibold shadow-lg shadow-primary/20"
+                    >
+                      {loginSaved ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Salvo com sucesso
+                        </>
+                      ) : (
+                        "Salvar conexao"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Model + quick commands */}
                 <div className="grid gap-3 rounded-[1.75rem] border border-border bg-card/70 p-3 shadow-sm backdrop-blur-xl">
                   <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
                     <div className="space-y-1.5">
@@ -279,7 +360,7 @@ export default function ChatPage() {
             {isStreaming && (
               <div className="mb-6 ml-11 flex items-center gap-2 text-xs text-muted-foreground">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                HokClaw pensando
+                Hokmá pensando
                 <span className="typing-dots inline-flex"><span /><span /><span /></span>
               </div>
             )}

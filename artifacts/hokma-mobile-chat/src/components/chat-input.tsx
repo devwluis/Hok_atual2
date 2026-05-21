@@ -209,7 +209,7 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
             value={input}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder={isReading ? "Lendo arquivos..." : "Ask HokClaw..."}
+            placeholder={isReading ? "Lendo arquivos..." : "Ask Hokmá..."}
             className="max-h-[132px] min-h-[42px] flex-1 resize-none bg-transparent px-1 py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
             disabled={isStreaming || isReading}

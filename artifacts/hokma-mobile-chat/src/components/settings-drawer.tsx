@@ -10,7 +10,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Settings, Trash2, Server, Key, Wifi, FlaskConical, Dna, Route, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Settings, Trash2, Server, Key, Wifi, FlaskConical, Route, Eye, EyeOff, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import type { ConnectionStatus, EngineConfig, HokConfig } from "@/hooks/use-chat";
 import { MODEL_OPTIONS } from "@/hooks/use-chat";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -91,8 +91,8 @@ export function SettingsDrawer({
         <div className="mx-auto w-full max-w-sm">
           <DrawerHeader>
             <DrawerTitle className="flex items-center justify-center gap-2">
-              <Dna className="h-5 w-5 text-primary" />
-              Configuracao HokClaw
+              <img src="/hokma-logo.png" alt="Hokmá" className="h-6 w-6 rounded-lg object-cover" />
+              Configuracao Hokmá
             </DrawerTitle>
             <DrawerDescription>Conecte ao HOK Orquestrador, OpenRouter Visao ou ao servidor local.</DrawerDescription>
           </DrawerHeader>

@@ -82,7 +82,7 @@ const DEFAULT_ENGINE_CONFIG: EngineConfig = {
 };
 
 export const AGENTS: Agent[] = [
-  { id: "openclaw", name: "OpenClaw", shortName: "Core", icon: "Dna", description: "Executor central, comandos naturais e orquestracao", color: "text-cyan-500" },
+  { id: "openclaw", name: "Hokmá", shortName: "Core", icon: "Dna", description: "Executor central, comandos naturais e orquestracao", color: "text-amber-400" },
   { id: "coder", name: "Coder", shortName: "Code", icon: "Code2", description: "Programacao, scripts, leitura de arquivos e debug", color: "text-blue-500" },
   { id: "devops", name: "DevOps", shortName: "Ops", icon: "ServerCog", description: "Termux, servidores, rede, deploy e automacao", color: "text-emerald-500" },
   { id: "architect", name: "Architect", shortName: "Plan", icon: "Network", description: "Arquitetura, produto e sistemas complexos", color: "text-violet-500" },
@@ -242,7 +242,7 @@ function createWelcomeMessage(): Message {
   return {
     id: "welcome",
     role: "assistant",
-    content: "HokClaw AI Agent online. Escolha um agente, selecione o modelo, anexe arquivos se precisar e envie seu comando.",
+    content: "Hokmá AI Agent online. Escolha um agente, selecione o modelo, anexe arquivos se precisar e envie seu comando.",
     timestamp: new Date(),
   };
 }
