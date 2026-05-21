@@ -97,6 +97,8 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const inputRef = useRef(input);
+  useEffect(() => { inputRef.current = input; }, [input]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isReading, setIsReading] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -192,7 +194,8 @@ export function ChatInput({ input, setInput, onSend, isStreaming }: ChatInputPro
         }
       }
       if (final) {
-        setInput((prev) => (prev ? prev + " " + final.trim() : final.trim()));
+        const cur = inputRef.current;
+        setInput(cur ? cur + " " + final.trim() : final.trim());
         setInterimText("");
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";

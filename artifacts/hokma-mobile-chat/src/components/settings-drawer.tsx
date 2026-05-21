@@ -179,11 +179,23 @@ export function SettingsDrawer({
                   </div>
                 </div>
 
+                {/* HOK Backend URL (direto) */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">HOK Backend (URL direta)</label>
+                  <input
+                    value={hokDraft.hokBackendUrl}
+                    onChange={(e) => setHokDraft((c) => ({ ...c, hokBackendUrl: e.target.value }))}
+                    className="w-full rounded-2xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+                    placeholder="http://10.168.212.48:18800"
+                  />
+                  <p className="text-[11px] text-muted-foreground">URL direta do backend IA (Termux/PC). Usada como fallback quando o tunel nao esta ativo.</p>
+                </div>
+
                 {/* OpenRouter API Key */}
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <Key className="h-3.5 w-3.5" />
-                    OpenRouter API Key (para visao de imagens)
+                    OpenRouter API Key (texto + visao de imagens)
                   </div>
                   <div className="relative">
                     <input
