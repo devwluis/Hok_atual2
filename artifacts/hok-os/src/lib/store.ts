@@ -132,7 +132,8 @@ function hokHeaders(token: string): Record<string, string> {
   };
 }
 
-export async function apiChat(
+// Non-streaming fallback (used internally by apiChatStream)
+async function apiFetch(
   config: HokConfig,
   messages: { role: string; content: string }[],
   model: string,
@@ -146,6 +147,130 @@ export async function apiChat(
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json() as { reply?: string; message?: string };
   return data.reply ?? data.message ?? "(sem resposta)";
+}
+
+// ─── SSE streaming chat ───────────────────────────────────────────
+// Calls onChunk(token) for each streamed token, onDone() when finished.
+// Falls back to non-streaming JSON if the server doesn't send SSE.
+// The AbortController signal can be used to cancel mid-stream.
+export async function apiChatStream(
+  config: HokConfig,
+  messages: { role: string; content: string }[],
+  model: string,
+  onChunk: (token: string) => void,
+  onDone: () => void,
+  onError: (err: string) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const last = messages[messages.length - 1]?.content ?? "";
+  const base = config.serverUrl.replace(/\/$/, "");
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}/hok`, {
+      method: "POST",
+      headers: { ...hokHeaders(config.token), Accept: "text/event-stream" },
+      body: JSON.stringify({
+        message: last,
+        model,
+        history: messages.slice(0, -1),
+        stream: true,
+      }),
+      signal,
+    });
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") return;
+    onError(err instanceof Error ? err.message : "Erro de rede");
+    return;
+  }
+
+  if (!res.ok) {
+    onError(`HTTP ${res.status}`);
+    return;
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+
+  // ── SSE path ────────────────────────────────────────────────────
+  if (contentType.includes("text/event-stream") || contentType.includes("octet-stream")) {
+    const reader = res.body?.getReader();
+    if (!reader) { onError("ReadableStream não suportado"); return; }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (signal?.aborted) { reader.cancel(); break; }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(":")) continue; // SSE comments
+
+          if (trimmed.startsWith("data:")) {
+            const data = trimmed.slice(5).trim();
+            if (data === "[DONE]") { onDone(); return; }
+            try {
+              const json = JSON.parse(data) as {
+                choices?: { delta?: { content?: string }; finish_reason?: string }[];
+                reply?: string;
+                token?: string;
+              };
+              // OpenAI-compatible delta format
+              const token =
+                json.choices?.[0]?.delta?.content ??
+                json.reply ??
+                json.token ??
+                "";
+              if (token) onChunk(token);
+              if (json.choices?.[0]?.finish_reason === "stop") { onDone(); return; }
+            } catch {
+              // Non-JSON line — treat as raw token
+              if (data) onChunk(data);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as { name?: string }).name !== "AbortError") {
+        onError(err instanceof Error ? err.message : "Erro no stream");
+        return;
+      }
+    }
+    onDone();
+    return;
+  }
+
+  // ── JSON fallback ────────────────────────────────────────────────
+  try {
+    const data = await res.json() as { reply?: string; message?: string };
+    const reply = data.reply ?? data.message ?? "(sem resposta)";
+    // Simulate token-by-token for a smooth feel even without real SSE
+    const words = reply.split(/(?<=\s)/);
+    for (const word of words) {
+      if (signal?.aborted) break;
+      onChunk(word);
+      await new Promise<void>((r) => setTimeout(r, 18));
+    }
+    onDone();
+  } catch (err) {
+    onError(err instanceof Error ? err.message : "Erro ao parsear resposta");
+  }
+}
+
+// Keep the old non-streaming export for any other callers
+export async function apiChat(
+  config: HokConfig,
+  messages: { role: string; content: string }[],
+  model: string,
+): Promise<string> {
+  return apiFetch(config, messages, model);
 }
 
 export async function apiPing(config: HokConfig): Promise<{ status: string; version?: string; uptime?: number }> {
