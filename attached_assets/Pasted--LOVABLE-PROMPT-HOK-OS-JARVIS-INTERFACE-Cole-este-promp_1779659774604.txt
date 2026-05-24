@@ -1,0 +1,233 @@
+# LOVABLE PROMPT — HOK OS · JARVIS INTERFACE
+# Cole este prompt completo no Lovable como primeira mensagem
+
+---
+
+Build a complete React single-page application called **HOK OS** — a personal AI orchestrator interface for developers. The visual identity must feel like a fusion between **Anthropic's Claude interface restraint** and **Jarvis from Iron Man's holographic UI** — but stripped to its absolute minimum. No noise. No clutter. Only what matters.
+
+---
+
+## AESTHETIC DIRECTION — "Obsidian Glass"
+
+The design language is: **minimal dark glass with surgical precision.**
+
+Imagine Tony Stark's HUD reimagined by the Anthropic design team — confident negative space, a single cold accent color, typography that breathes, and UI elements that feel like they float on depth rather than sit on a surface.
+
+### Color System
+```
+--bg-deep:      #080A0C      (near-black with cool blue undertone, NOT pure black)
+--bg-surface:   #0D1117      (card / panel background)
+--bg-elevated:  #131920      (input, hover states)
+--border:       rgba(255,255,255,0.06)   (barely-there borders)
+--border-glow:  rgba(99,179,237,0.2)    (focused/active border)
+--accent:       #63B3ED      (electric steel blue — Jarvis hologram)
+--accent-dim:   rgba(99,179,237,0.12)
+--text-primary: #E8EEF4
+--text-secondary: #6B7E8F
+--text-muted:   #3A4E5E
+--online:       #48BB78
+--offline:      #FC8181
+--warning:      #F6AD55
+```
+
+### Typography
+- **Display / headers**: `IBM Plex Mono` — technical, authoritative
+- **Body / messages**: `Inter` — clean reading at any size
+- Sizes: use a tight scale — 11px labels, 13px body, 15px headings. Nothing larger.
+- Letter-spacing: `0.08em` on ALL-CAPS labels. Tight on everything else.
+
+### Spatial Logic
+- Every panel has **generous padding** (24–32px). Never cramped.
+- **4px border-radius** max — sharp, not rounded like a consumer app.
+- Borders are `rgba(255,255,255,0.06)` — visible only on dark panels, never loud.
+- No shadows except `0 1px 3px rgba(0,0,0,0.4)` for elevated elements.
+- The active/focused state uses a subtle `box-shadow: 0 0 0 1px var(--border-glow)` — like a hologram frame.
+
+---
+
+## APP ARCHITECTURE
+
+### Layout
+```
+┌──────────────────────────────────────────────────┐
+│  TOPBAR (48px)   logo · nav · model · status     │
+├──────────────┬───────────────────────────────────┤
+│  SIDEBAR     │  MAIN PANEL                       │
+│  (220px)     │  (flex 1)                         │
+│  conv list   │  switches per view                │
+└──────────────┴───────────────────────────────────┘
+```
+
+Sidebar collapses to 0 with smooth transition on toggle. Topbar always visible.
+
+---
+
+## VIEWS / MODULES
+
+### 1. CHAT (default view)
+The chat must feel like Claude's interface — but darker, more focused, with developer DNA.
+
+**Message bubbles:**
+- User messages: right-aligned, `bg: #0F1923`, border-left with accent, no avatar
+- Assistant messages: left-aligned, no background — text floats on the dark canvas
+- `<hok_cmd>` blocks: rendered as a special pill with a `$` prefix, monospace, accent border-left, copy button on hover
+- Code blocks: syntax-highlighted dark, `IBM Plex Mono`, language label top-right
+
+**Input area:**
+- Full-width textarea at bottom, seamlessly integrated — no obvious "box"
+- Single `↑` send button that glows blue on hover
+- Below input: tiny status line — active model + token count estimate
+
+**Conversation sidebar:**
+- Each conversation shows: title (first 36 chars of first message), date, message count badge
+- Active conversation has a thin left accent bar
+- New conversation button: `+` icon, minimal text, top of sidebar
+- Conversations persist in localStorage, unlimited storage
+
+### 2. TERMINAL
+Fullscreen terminal emulator aesthetic.
+- Three traffic-light dots (decorative) top-left
+- Monospaced output, color-coded: `$` commands in accent blue, stdout in muted white, errors in `#FC8181`
+- Input line with blinking cursor animation
+- Command history with ↑↓ arrow keys
+- Connects to HOK OS `/shell` endpoint
+
+### 3. SKILLS
+Grid of skill cards (2 columns).
+Each card:
+- Skill name in `IBM Plex Mono`
+- Short description in small body text
+- Command preview in a dark code pill
+- Tag badges — small, subtle
+- Toggle switch (right side) — minimal, accent-colored when ON
+- "Add Skill" button opens an inline form that slides in from bottom (no modal)
+
+### 4. TUNNEL
+Connection panel.
+- Large status indicator: a pulsing dot + status text — green "CONNECTED" or red "OFFLINE"
+- Provider selector: pill buttons (Serveo / ngrok / localhost.run)
+- Connect / Disconnect actions
+- Live log at bottom — auto-scrolling, monospaced
+- Webhook URLs listed when connected
+
+### 5. DASHBOARD
+System overview. Minimal grid of stat cards.
+- Each card: icon + number + label — nothing more
+- Model cascade list — compact, no decorations
+- Roadmap: a vertical timeline with phase markers (● done, ○ upcoming)
+
+### 6. SETTINGS
+Clean form layout. No nested sections.
+- Server URL field
+- Token field (password type)
+- Save button with subtle confirmation
+- Quick-start code snippet block
+
+---
+
+## TOPBAR DETAILS
+
+Left: hexagon logo `⬡` with subtle glow + "HOK OS" in IBM Plex Mono + version badge
+
+Center: Navigation — text tabs, NO icons unless necessary. Active tab has accent underline border, never background fill.
+Tabs: `Dashboard · Chat · Terminal · Skills · Tunnel · Config`
+
+Right:
+- Model selector — compact dropdown, shows current model icon + short name
+- Status pill — `● online` in green or `● offline` in red, pulsing dot animation on online
+
+---
+
+## INTERACTIONS & ANIMATION
+
+Be intentional — only 4 types of animation:
+
+1. **Page/view transition**: opacity 0→1, translateY 6px→0, 180ms ease-out
+2. **Hover states**: border color, text color change, 120ms — no scale transforms
+3. **Online pulse**: CSS `@keyframes ping` on the status dot only
+4. **Cursor blink**: 1s `@keyframes blink` in terminal and chat streaming cursor
+
+No bounces. No spring physics. No scale animations. Zero decorative particles.
+
+---
+
+## FUNCTIONAL REQUIREMENTS
+
+```typescript
+// API integration
+const HOK_BASE = "http://127.0.0.1:8081"
+
+// Endpoints used:
+// POST /          → { message, model, history } → { reply, model }
+// GET  /ping      → { status, version, uptime }
+// POST /shell     → { cmd } → { output, sucesso }
+// GET  /models    → { models[] }
+// GET  /history   → conversation history
+// POST /index     → index codebase
+// POST /fix       → error analysis
+// POST /notify    → Android notification
+
+// Auth header: X-HOK-TOKEN: <user_token>
+```
+
+**Conversation persistence:**
+- Store in localStorage as `hok_conversations` JSON array
+- Each conversation: `{ id, title, messages[], date, model }`
+- Each message: `{ role, content, ts, model }`
+- No limit on conversation count or message depth
+- Auto-generate title from first user message (first 40 chars)
+
+**Model cascade** (show in selector):
+```
+deepseek/deepseek-r1:free          → "R1 Deep"    ⚡
+deepseek/deepseek-chat-v3-0324:free → "Chat v3"   ◈
+google/gemini-2.0-flash-exp:free   → "Gemini"     ✦
+meta-llama/llama-4-maverick:free   → "Llama 4"    ◉
+deepseek/deepseek-r1-distill-llama-70b:free → "R1 Code" ⬡
+microsoft/phi-4-reasoning-plus:free → "Phi-4"     φ
+mistralai/mistral-7b-instruct:free → "Mistral"    M
+```
+
+**Offline mode:**
+- App always loads and shows all views
+- Offline indicator is clear but not alarming
+- Chat still accepts input — shows tasteful offline message
+- No broken states, no crashed panels
+
+---
+
+## MICRO-DETAILS (make these perfect)
+
+- Custom scrollbar: 3px wide, `--bg-elevated` track, `--text-muted` thumb, no border-radius
+- All `<code>` elements: `IBM Plex Mono`, size 12px, `--bg-surface` background, 2px padding
+- Focus rings: `0 0 0 1px rgba(99,179,237,0.4)` — never browser default
+- Empty states: one line of muted text, center-aligned, no illustration
+- Loading state in chat: three dots with staggered opacity animation (not bouncing dots)
+- Timestamp: always `HH:MM` format, bottom of each message, 10px, muted
+- On mobile (< 768px): sidebar hidden by default, nav collapses to icon-only
+
+---
+
+## WHAT NOT TO BUILD
+
+- No gradients on text
+- No glassmorphism blur effects
+- No colored panels or sections
+- No emoji in UI chrome (only allowed inside chat messages)
+- No tooltips unless absolutely necessary
+- No loading spinners — only inline text states
+- No modals — use inline expansion or slide-in panels
+- No purple, no neon green, no red UI accents
+- No cards with drop shadows
+
+---
+
+## PERSONALITY NOTE
+
+This interface is used by one developer — Washington — who talks to it like JARVIS. The interface should feel like a cockpit: everything in reach, nothing in the way. It respects the user's intelligence. It never wastes space. When online, it barely announces itself — it just works.
+
+The accent color `#63B3ED` is the only moment of color in the entire interface. Use it with restraint: active states, focused inputs, the online indicator, command highlights. Everywhere else is darkness and typography.
+
+---
+
+Start by building the full layout shell with all 6 views, then implement Chat with full conversation management, then Terminal, then the remaining views. Use `useState` and `localStorage` for all state — no external state libraries needed.
