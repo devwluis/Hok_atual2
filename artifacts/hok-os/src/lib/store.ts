@@ -292,6 +292,129 @@ export async function apiShell(config: HokConfig, cmd: string): Promise<{ output
   return res.json() as Promise<{ output: string; sucesso: boolean }>;
 }
 
+// ─── Orchestrator ─────────────────────────────────────────────────
+// Analyses the message + recent history and picks the best free model.
+export interface OrchestratorResult {
+  modelId: string;
+  label: string;
+  reason: string;
+}
+
+export function orchestrateModel(
+  userMessage: string,
+  history: { role: string; content: string }[],
+): OrchestratorResult {
+  // Build a combined text window from last 3 messages + current input
+  const ctx = [
+    ...history.slice(-3).map((m) => m.content),
+    userMessage,
+  ].join(" ").toLowerCase();
+
+  // Regex rules ordered from most-specific to least-specific
+  const rules: Array<{ pattern: RegExp; modelId: string; label: string; reason: string }> = [
+    {
+      pattern: /\b(código|code|bug|debug|error|erro|exception|função|function|class|script|python|javascript|typescript|rust|java|go|programar|implementar|refactor|algoritmo|algorit|compilar|syntax)\b/,
+      modelId: "deepseek/deepseek-r1-distill-llama-70b:free",
+      label: "R1 Code",
+      reason: "código/programação",
+    },
+    {
+      pattern: /\b(matemática|math|calcul|equação|equacao|integral|derivada|álgebra|algebra|estatística|statistic|theorem|prova matemática|trigon|probabilidade)\b/,
+      modelId: "microsoft/phi-4-reasoning-plus:free",
+      label: "Phi-4",
+      reason: "matemática",
+    },
+    {
+      pattern: /\b(raciocin|reason|analisa|analis|complexo|difícil|explica detalhada|por que|como funciona|arquitetura|diagnósti|diagnose|investiga|investig|deep)\b/,
+      modelId: "deepseek/deepseek-r1:free",
+      label: "R1 Deep",
+      reason: "raciocínio profundo",
+    },
+    {
+      pattern: /\b(criativ|creative|escrever|redação|história|story|poema|poem|blog|artigo|text|criação|narrati|roteiro|script de texto)\b/,
+      modelId: "google/gemini-2.0-flash-exp:free",
+      label: "Gemini",
+      reason: "conteúdo criativo",
+    },
+    {
+      pattern: /\b(llama|meta|open.?source|llama4|maverick)\b/,
+      modelId: "meta-llama/llama-4-maverick:free",
+      label: "Llama 4",
+      reason: "solicitado",
+    },
+  ];
+
+  for (const rule of rules) {
+    if (rule.pattern.test(ctx)) {
+      return { modelId: rule.modelId, label: rule.label, reason: rule.reason };
+    }
+  }
+
+  // Default: fast general model
+  return {
+    modelId: "deepseek/deepseek-chat-v3-0324:free",
+    label: "Chat v3",
+    reason: "geral",
+  };
+}
+
+// ─── File reading from server ──────────────────────────────────────
+export interface AttachedFile {
+  id: string;
+  path: string;
+  content: string;
+  lines: number;
+  truncated: boolean;
+}
+
+// Read a file from the HOK server via shell. Capped at MAX_LINES lines.
+const MAX_FILE_LINES = 250;
+
+export async function readFileFromServer(
+  config: HokConfig,
+  filePath: string,
+): Promise<AttachedFile> {
+  const cmd = `cat "${filePath}" 2>/dev/null | head -${MAX_FILE_LINES + 1}`;
+  const { output, sucesso } = await apiShell(config, cmd);
+
+  if (!sucesso && !output.trim()) {
+    throw new Error(`Arquivo não encontrado ou sem permissão: ${filePath}`);
+  }
+
+  const allLines = output.split("\n");
+  const truncated = allLines.length > MAX_FILE_LINES;
+  const lines = truncated ? allLines.slice(0, MAX_FILE_LINES) : allLines;
+
+  return {
+    id: uuid(),
+    path: filePath,
+    content: lines.join("\n"),
+    lines: lines.length,
+    truncated,
+  };
+}
+
+// Build context block to prepend to user message
+export function buildFileContext(files: AttachedFile[]): string {
+  if (files.length === 0) return "";
+  const blocks = files.map((f) => {
+    const ext = f.path.split(".").pop() ?? "";
+    const lang = EXT_LANG[ext] ?? ext;
+    const header = `### Arquivo: \`${f.path}\`${f.truncated ? ` (primeiras ${f.lines} linhas)` : ""}`;
+    return `${header}\n\`\`\`${lang}\n${f.content}\n\`\`\``;
+  });
+  return blocks.join("\n\n") + "\n\n---\n\n";
+}
+
+const EXT_LANG: Record<string, string> = {
+  js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx",
+  py: "python", rs: "rust", go: "go", java: "java", kt: "kotlin",
+  sh: "bash", zsh: "bash", fish: "bash", md: "markdown",
+  json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+  css: "css", html: "html", xml: "xml", sql: "sql",
+  c: "c", cpp: "cpp", h: "c",
+};
+
 // ─── Utils ───────────────────────────────────────────────────────
 export function formatTime(ts: number): string {
   const d = new Date(ts);
