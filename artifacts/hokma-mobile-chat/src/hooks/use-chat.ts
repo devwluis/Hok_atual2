@@ -186,7 +186,10 @@ async function streamPreviewResponse(
 // Ping leve: GET /ping na raiz do servidor HOK (sem token, sem DeepSeek)
 async function pingHokServer(hokUrl: string): Promise<boolean> {
   const base = hokUrl.trim().replace(/\/hok\/?$/, "").replace(/\/$/, "");
-  const response = await fetch(`${base}/ping`, { method: "GET" });
+  const response = await fetch(`${base}/ping`, {
+    method: "GET",
+    headers: { "ngrok-skip-browser-warning": "true" },
+  });
   if (!response.ok) return false;
   const data = await response.json() as { status?: string };
   return data.status === "online";
