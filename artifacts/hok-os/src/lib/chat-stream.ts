@@ -2,7 +2,7 @@
 // HOK backend sends NDJSON lines {"token":"..."} / {"delta":"..."} — no "data:" prefix needed.
 // We always read line-by-line; SSE "data:" prefix is stripped when present.
 
-export type StreamMsg = { role: "user" | "assistant"; content: string };
+export type StreamMsg = { role: "user" | "assistant" | "system"; content: string };
 
 export type StreamOpts = {
   baseUrl: string;
