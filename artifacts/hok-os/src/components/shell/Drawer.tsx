@@ -11,7 +11,7 @@ import { useAppState } from "@/hooks/use-app-state";
 import { conversationsStore } from "@/lib/conversations-store";
 import type { ScreenId } from "@/lib/app-state";
 import { cn } from "@/lib/utils";
-import logo from "@/assets/hokma-logo.png";
+import logo from "@/assets/hok-logo.png";
 import { usePersistentState } from "@/lib/use-persistent-state";
 
 const APPS: { id: ScreenId; label: string; Icon: typeof MessageCircle; color: string }[] = [
@@ -100,7 +100,7 @@ export function Drawer() {
             <div className="flex h-12 items-center justify-between border-b border-border px-4">
               <div className="flex items-center gap-2">
                 <img src={logo} alt="" className="h-7 w-7 rounded-md object-contain" />
-                <span className="text-sm font-bold">Finder · Hokmá</span>
+                <span className="text-sm font-bold tracking-tight">HOK Navigator</span>
               </div>
               <button onClick={() => toggleDrawer(false)} className="rounded-lg p-1.5 hover:bg-accent">
                 <X className="h-4 w-4" />
@@ -155,9 +155,7 @@ export function Drawer() {
                         active ? "bg-[color:var(--amber)]/10" : "hover:bg-accent",
                       )}
                     >
-                      <span className={cn("text-sm", active ? "text-[color:var(--amber)]" : "text-muted-foreground")}>
-                        📁
-                      </span>
+                      <MessageCircle className={cn("h-3.5 w-3.5 shrink-0", active ? "text-[color:var(--amber)]" : "text-muted-foreground/50")} />
                       {editing ? (
                         <input
                           autoFocus

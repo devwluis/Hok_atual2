@@ -85,7 +85,7 @@ function LightningArcs({ cx = 48, cy = 48 }: { cx?: number; cy?: number }) {
 }
 
 /* ── Main component ── */
-export function ElectricCore({ label = "Hokmá está pensando…", modelName }: {
+export function ElectricCore({ label = "Processando…", modelName }: {
   label?: string;
   modelName?: string;
 }) {
@@ -172,7 +172,7 @@ export function ElectricCore({ label = "Hokmá está pensando…", modelName }: 
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
           >
-            ⚡ {modelName}
+            {modelName}
           </motion.p>
         )}
       </div>

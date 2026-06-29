@@ -38,7 +38,7 @@ export function TopBar() {
         />
         <div className="flex flex-col leading-none">
           <span className="text-sm font-bold tracking-widest text-[color:var(--amber)]">H.O.K.</span>
-          <span className="text-[9px] font-mono tracking-wider text-[color:var(--cyan-glow)]/60 uppercase">Sistema Operacional</span>
+          <span className="text-[9px] font-mono tracking-wider text-muted-foreground uppercase">Dev · N8N · Automação</span>
         </div>
       </div>
 

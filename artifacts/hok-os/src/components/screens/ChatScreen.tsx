@@ -105,8 +105,8 @@ function MessageBubble({ msg, onSendToWebhook }: { msg: Msg; onSendToWebhook?: (
         {!isUser && msg.meta && (
           <div className="mt-2 flex items-center gap-2 border-t border-border/60 pt-1.5">
             {modelInfo && (
-              <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: modelInfo.color }}>
-                {modelInfo.emoji} {modelInfo.label}
+              <span className="flex items-center gap-1 text-[10px] font-mono font-medium" style={{ color: modelInfo.color }}>
+                {modelInfo.label}
               </span>
             )}
             <span className="ml-auto font-mono text-[10px] text-muted-foreground">
@@ -136,8 +136,7 @@ function ModelPicker({ selected, onSelect }: { selected: string; onSelect: (id: 
           )}
           style={selected === m.id ? { background: m.color } : undefined}
         >
-          <span>{m.emoji}</span>
-          <span>{m.label}</span>
+          <span className="text-[10px]">{m.label}</span>
         </button>
       ))}
     </div>
@@ -324,7 +323,7 @@ export function ChatScreen() {
               <div className="rounded-[20px] rounded-bl-md border border-border bg-card px-4">
                 <ElectricCore
                   label="Processando requisição…"
-                  modelName={activeModel.id !== "auto" ? `${activeModel.emoji} ${activeModel.label}` : undefined}
+                  modelName={activeModel.id !== "auto" ? activeModel.label : undefined}
                 />
               </div>
             </motion.div>
@@ -443,16 +442,15 @@ export function ChatScreen() {
             className="flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium transition-colors hover:border-[color:var(--amber)]/40"
             style={{ color: activeModel.color }}
           >
-            <span>{activeModel.emoji}</span>
-            <span>{activeModel.label}</span>
+            <span className="font-mono">{activeModel.label}</span>
             {showModelPicker ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
 
           {webSearch && (
-            <span className="text-[10px] text-[color:var(--cyan-glow)]">🌐 Web ativa</span>
+            <span className="text-[10px] font-mono text-[color:var(--cyan-glow)]">web:on</span>
           )}
           {debugMode && (
-            <span className="text-[10px] text-red-500">🐛 Debug</span>
+            <span className="text-[10px] font-mono text-red-500">debug:on</span>
           )}
 
           <span className="ml-auto text-[10px] text-muted-foreground">Enter · Shift↵ nova linha</span>

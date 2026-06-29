@@ -1,12 +1,8 @@
-// AI models available in the HOK backend
-// Source: HOK OS Backend context document
-
 export type HokModel = {
-  id: string;           // sent in "model" field to backend
-  label: string;        // display name
-  provider: string;     // provider tag
-  color: string;        // accent color
-  emoji: string;
+  id: string;
+  label: string;
+  provider: string;
+  color: string;
   description: string;
 };
 
@@ -16,56 +12,49 @@ export const HOK_MODELS: HokModel[] = [
     label: "Auto",
     provider: "HOK",
     color: "#F5A623",
-    emoji: "🧠",
-    description: "HOK decide o melhor modelo",
+    description: "HOK escolhe o modelo ideal para cada tarefa",
   },
   {
     id: "nousresearch/hermes-4-70b",
     label: "Hermes 4",
     provider: "OpenRouter",
     color: "#8b5cf6",
-    emoji: "⚗️",
-    description: "Hermes-4 70B via OpenRouter — modelo default",
+    description: "Hermes-4 70B — raciocínio e código complexo",
   },
   {
     id: "cerebras",
     label: "Cerebras",
     provider: "Cerebras",
     color: "#ef4444",
-    emoji: "⚡",
-    description: "Ultra-rápido — 1º da cascata de fallback",
+    description: "Ultra-rápido — ideal para iterações rápidas",
   },
   {
     id: "groq",
     label: "Groq",
     provider: "Groq",
     color: "#22c55e",
-    emoji: "🚀",
-    description: "Groq Llama 3.3 70B — 2º da cascata",
+    description: "Llama 3.3 70B — velocidade + qualidade",
   },
   {
     id: "gemini-2.5-flash",
-    label: "Gemini Flash",
+    label: "Gemini",
     provider: "Google",
     color: "#3b82f6",
-    emoji: "✨",
-    description: "Gemini 2.5 Flash — motor do Hermes Agent",
+    description: "Gemini 2.5 Flash — multimodal e contexto longo",
   },
   {
     id: "gemini-2.5-flash-lite",
     label: "Gemini Lite",
     provider: "Google",
     color: "#60a5fa",
-    emoji: "💡",
-    description: "Gemini Flash Lite — leve e rápido",
+    description: "Gemini Flash Lite — leve para tarefas simples",
   },
   {
     id: "deepseek",
     label: "DeepSeek",
     provider: "DeepSeek",
     color: "#06b6d4",
-    emoji: "🔬",
-    description: "DeepSeek — reserva configurável",
+    description: "DeepSeek — código e análise técnica",
   },
 ];
 
