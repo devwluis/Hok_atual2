@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Bug, Send, Copy, Webhook, ChevronDown, ChevronUp } from "lucide-react";
+import { Globe, Bug, Send, Copy, Webhook, ChevronDown, ChevronUp, Workflow, X } from "lucide-react";
 import { ElectricCore } from "@/components/chat/ElectricCore";
 import { NuclearCore } from "@/components/chat/NuclearCore";
 import { cn } from "@/lib/utils";
 import { conversationsStore, type ChatMessage } from "@/lib/conversations-store";
 import { useAppState } from "@/hooks/use-app-state";
 import { HOK_MODELS, getModel } from "@/lib/hok-models";
+import { detectN8NIntent, N8N_SYSTEM_PROMPT, type N8NModeState } from "@/lib/n8n-expert";
 
 // Unified settings key
 const SETTINGS_KEY = "hokma.settings.v1";
@@ -155,6 +156,9 @@ export function ChatScreen() {
   const [webhookResult, setWebhookResult] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState("auto");
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [n8nMode, setN8nMode] = useState<N8NModeState>("off");
+
+  const n8nActive = n8nMode !== "off";
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -229,6 +233,12 @@ export function ChatScreen() {
     setLoading(true);
     accRef.current = "";
 
+    // ── N8N intent auto-detection ──
+    if (n8nMode === "off" && detectN8NIntent(t)) {
+      setN8nMode("auto");
+    }
+    const isN8N = n8nMode !== "off" || detectN8NIntent(t);
+
     const { serverUrl, token } = readSettings();
 
     if (serverUrl && !token) {
@@ -244,6 +254,12 @@ export function ChatScreen() {
 
     abortRef.current = new AbortController();
 
+    // Build messages — inject N8N system prompt at the top when active
+    const outMessages: { role: "user" | "assistant" | "system"; content: string }[] = [
+      ...(isN8N ? [{ role: "system" as const, content: N8N_SYSTEM_PROMPT }] : []),
+      ...afterUser.map((m) => ({ role: m.role as "user" | "assistant", content: m.text })),
+    ];
+
     try {
       const { streamChat } = await import("@/lib/chat-stream");
       await streamChat({
@@ -252,7 +268,7 @@ export function ChatScreen() {
         token,
         webSearch,
         selectedModel,
-        messages: afterUser.map((m) => ({ role: m.role, content: m.text })),
+        messages: outMessages,
         signal: abortRef.current.signal,
         onToken: (delta) => {
           accRef.current += delta;
@@ -346,6 +362,37 @@ export function ChatScreen() {
           {webhookResult}
         </div>
       )}
+
+      {/* ── N8N Expert Mode banner ── */}
+      <AnimatePresence>
+        {n8nActive && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="mx-4 mb-2 flex items-center gap-2 rounded-xl border px-3 py-2"
+            style={{
+              borderColor: "rgba(225,29,72,0.35)",
+              background: "rgba(225,29,72,0.07)",
+            }}
+          >
+            <Workflow className="h-3.5 w-3.5 shrink-0 text-rose-500" />
+            <span className="flex-1 text-[11px] font-medium text-rose-500">
+              Modo N8N Expert ativo
+              {n8nMode === "auto" && (
+                <span className="ml-1 text-rose-400/70 font-normal">· detectado automaticamente</span>
+              )}
+            </span>
+            <button
+              onClick={() => setN8nMode("off")}
+              className="rounded-md p-0.5 text-rose-400/60 hover:text-rose-400 transition-colors"
+              title="Desativar modo N8N"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── No settings info ── */}
       {messages.length === 0 && !loading && !serverUrl && (
@@ -446,6 +493,21 @@ export function ChatScreen() {
             {showModelPicker ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
 
+          {/* N8N mode toggle */}
+          <button
+            onClick={() => setN8nMode((v) => v === "off" ? "manual" : "off")}
+            title={n8nActive ? "Desativar Modo N8N" : "Ativar Modo N8N Expert"}
+            className={cn(
+              "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-mono font-medium transition-all",
+              n8nActive
+                ? "border-rose-500/40 bg-rose-500/10 text-rose-500"
+                : "border-border bg-card text-muted-foreground hover:border-rose-500/30 hover:text-rose-400",
+            )}
+          >
+            <Workflow className="h-3 w-3" />
+            N8N
+          </button>
+
           {webSearch && (
             <span className="text-[10px] font-mono text-[color:var(--cyan-glow)]">web:on</span>
           )}
@@ -453,7 +515,7 @@ export function ChatScreen() {
             <span className="text-[10px] font-mono text-red-500">debug:on</span>
           )}
 
-          <span className="ml-auto text-[10px] text-muted-foreground">Enter · Shift↵ nova linha</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">Enter · Shift↵</span>
         </div>
       </div>
     </div>
