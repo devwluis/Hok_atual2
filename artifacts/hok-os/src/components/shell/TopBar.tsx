@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useTheme } from "@/hooks/use-theme";
 import { useAppState } from "@/hooks/use-app-state";
 import { useBackendStatus } from "@/hooks/use-backend-status";
-import logo from "@/assets/hokma-logo.png";
+import logo from "@/assets/hok-logo.png";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
@@ -28,14 +28,18 @@ export function TopBar() {
       <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-2">
         <motion.img
           src={logo}
-          alt="Hokmá"
-          className="h-7 w-7 rounded-md object-contain"
+          alt="H.O.K."
+          className="h-8 w-8 rounded-xl object-contain"
+          style={{ filter: "drop-shadow(0 0 6px rgba(245,166,35,0.5))" }}
           initial={{ rotate: -8, scale: 0.9, opacity: 0 }}
           animate={{ rotate: 0, scale: 1, opacity: 1 }}
-          whileHover={{ rotate: [0, -6, 6, 0], transition: { duration: 0.6 } }}
+          whileHover={{ scale: 1.1, transition: { duration: 0.3 } }}
           transition={{ type: "spring", stiffness: 260, damping: 18 }}
         />
-        <span className="text-sm font-semibold tracking-tight">Hokmá</span>
+        <div className="flex flex-col leading-none">
+          <span className="text-sm font-bold tracking-widest text-[color:var(--amber)]">H.O.K.</span>
+          <span className="text-[9px] font-mono tracking-wider text-[color:var(--cyan-glow)]/60 uppercase">Sistema Operacional</span>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

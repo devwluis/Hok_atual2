@@ -323,7 +323,7 @@ export function ChatScreen() {
             >
               <div className="rounded-[20px] rounded-bl-md border border-border bg-card px-4">
                 <ElectricCore
-                  label="Hokmá está pensando…"
+                  label="Processando requisição…"
                   modelName={activeModel.id !== "auto" ? `${activeModel.emoji} ${activeModel.label}` : undefined}
                 />
               </div>
@@ -351,7 +351,7 @@ export function ChatScreen() {
       {/* ── No settings info ── */}
       {messages.length === 0 && !loading && !serverUrl && (
         <div className="mx-4 mb-2 rounded-xl border border-border bg-card px-4 py-3 text-xs text-muted-foreground">
-          Usando AI interno (Groq). Configure <strong>Server URL</strong> + <strong>HOK_TOKEN</strong> nas Configurações para usar o servidor HOK.
+          Operando via IA interna (Groq). Configure <strong>Server URL</strong> + <strong>HOK_TOKEN</strong> nas Configurações para conectar ao servidor HOK.
         </div>
       )}
 
@@ -379,7 +379,7 @@ export function ChatScreen() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="Mensagem para Hokmá…"
+            placeholder="Insira sua instrução, Sr.…"
             rows={1}
             className="flex-1 resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             style={{ maxHeight: 120 }}
