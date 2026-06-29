@@ -99,6 +99,35 @@ function WorkflowsPanel({
   const [testMode, setTestMode]     = useState(false);
   const abortRef                    = useRef<AbortController | null>(null);
 
+  // Quick fire state per workflow id
+  const [quickFiring, setQuickFiring]   = useState<Record<string, boolean>>({});
+  const [quickResult, setQuickResult]   = useState<Record<string, "ok" | "err">>({});
+
+  const quickFire = async (wf: N8NWorkflow) => {
+    const nodes = extractWebhookNodes(wf);
+    if (!nodes.length) return;
+    const wn = nodes[0];
+    const url = buildWebhookUrl(baseUrl, wn.path, testMode);
+    const method = (wn.method.toUpperCase() === "GET" ? "GET" : "POST") as "POST" | "GET";
+
+    setQuickFiring((s) => ({ ...s, [wf.id]: true }));
+    setQuickResult((s) => { const n = { ...s }; delete n[wf.id]; return n; });
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: method === "POST" ? { "Content-Type": "application/json" } : {},
+        ...(method === "POST" ? { body: "{}" } : {}),
+      });
+      setQuickResult((s) => ({ ...s, [wf.id]: res.ok ? "ok" : "err" }));
+    } catch {
+      setQuickResult((s) => ({ ...s, [wf.id]: "err" }));
+    } finally {
+      setQuickFiring((s) => ({ ...s, [wf.id]: false }));
+      setTimeout(() => setQuickResult((s) => { const n = { ...s }; delete n[wf.id]; return n; }), 2500);
+    }
+  };
+
   /**
    * Fetches workflows via the same-origin /api/n8n-proxy backend route.
    * This keeps X-N8N-API-KEY server-side and avoids CORS preflight issues.
@@ -275,47 +304,82 @@ function WorkflowsPanel({
                 )}
               >
                 {/* Workflow row */}
-                <button
-                  onClick={() => setExpanded(isExpanded ? null : wf.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left"
-                >
-                  <Workflow className={cn(
-                    "h-4 w-4 shrink-0",
-                    wf.active ? "text-emerald-500" : "text-muted-foreground",
-                  )} />
+                <div className="flex w-full items-center gap-2 px-3 py-3">
+                  <button
+                    onClick={() => setExpanded(isExpanded ? null : wf.id)}
+                    className="flex flex-1 min-w-0 items-center gap-3 text-left"
+                  >
+                    <Workflow className={cn(
+                      "h-4 w-4 shrink-0",
+                      wf.active ? "text-emerald-500" : "text-muted-foreground",
+                    )} />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm font-semibold">{wf.name}</span>
-                      <span className={cn(
-                        "shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold",
-                        wf.active
-                          ? "bg-emerald-500/15 text-emerald-500"
-                          : "bg-muted text-muted-foreground",
-                      )}>
-                        {wf.active ? "ativo" : "inativo"}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      ID {wf.id}
-                      {wf.tags && wf.tags.length > 0 && (
-                        <span className="ml-1.5">
-                          {wf.tags.map((t) => `#${t.name}`).join(" ")}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-sm font-semibold">{wf.name}</span>
+                        <span className={cn(
+                          "shrink-0 rounded-full px-1.5 py-px text-[10px] font-bold",
+                          wf.active
+                            ? "bg-emerald-500/15 text-emerald-500"
+                            : "bg-muted text-muted-foreground",
+                        )}>
+                          {wf.active ? "ativo" : "inativo"}
                         </span>
-                      )}
-                      {hasWebhooks && (
-                        <span className="ml-1.5 text-[color:var(--amber)]">
-                          ⚡ {webhookNodes.length} webhook{webhookNodes.length > 1 ? "s" : ""}
-                        </span>
-                      )}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        ID {wf.id}
+                        {wf.tags && wf.tags.length > 0 && (
+                          <span className="ml-1.5">
+                            {wf.tags.map((t) => `#${t.name}`).join(" ")}
+                          </span>
+                        )}
+                        {hasWebhooks && (
+                          <span className="ml-1.5 text-[color:var(--amber)]">
+                            {webhookNodes.length} webhook{webhookNodes.length > 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <ChevronRight className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                    isExpanded && "rotate-90",
-                  )} />
-                </button>
+                    <ChevronRight className={cn(
+                      "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+                      isExpanded && "rotate-90",
+                    )} />
+                  </button>
+
+                  {/* Quick fire button — só para workflows ativos com webhooks */}
+                  {wf.active && hasWebhooks && (
+                    <motion.button
+                      onClick={(e) => { e.stopPropagation(); quickFire(wf); }}
+                      disabled={quickFiring[wf.id]}
+                      whileTap={{ scale: 0.88 }}
+                      className={cn(
+                        "shrink-0 flex h-8 w-8 items-center justify-center rounded-xl border transition-all",
+                        quickResult[wf.id] === "ok"
+                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-500"
+                          : quickResult[wf.id] === "err"
+                          ? "border-destructive/40 bg-destructive/10 text-destructive"
+                          : "border-[color:var(--amber)]/30 bg-[color:var(--amber)]/10 text-[color:var(--amber)] hover:bg-[color:var(--amber)]/20",
+                      )}
+                      title="Disparar webhook agora"
+                    >
+                      {quickFiring[wf.id] ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 0.7, repeat: Infinity, ease: "linear" }}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </motion.div>
+                      ) : quickResult[wf.id] === "ok" ? (
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                      ) : quickResult[wf.id] === "err" ? (
+                        <AlertCircle className="h-3.5 w-3.5" />
+                      ) : (
+                        <Zap className="h-3.5 w-3.5" />
+                      )}
+                    </motion.button>
+                  )}
+                </div>
 
                 {/* Expanded: webhook nodes */}
                 <AnimatePresence>
