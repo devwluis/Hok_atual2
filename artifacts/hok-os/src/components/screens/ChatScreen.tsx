@@ -318,8 +318,49 @@ export function ChatScreen() {
       {/* ── Messages ── */}
       <div className="thin-scroll flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && !loading && (
-          <div className="flex h-full items-center justify-center">
+          <div className="flex h-full flex-col items-center justify-center gap-6">
             <NuclearCore />
+
+            {/* ── N8N quick templates ── */}
+            <motion.div
+              className="w-full max-w-sm space-y-2 px-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55, duration: 0.45 }}
+            >
+              <p className="text-center text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground/50 mb-3">
+                templates N8N
+              </p>
+              {[
+                {
+                  label: "Webhook → processa → notifica Telegram",
+                  prompt: "Crie um workflow N8N que recebe dados via Webhook, processa o payload com um Code Node e envia uma notificação formatada no Telegram.",
+                },
+                {
+                  label: "Schedule → busca API → salva Supabase",
+                  prompt: "Crie um workflow N8N com trigger Schedule (cron diário), que faz uma requisição HTTP para uma API externa e salva os resultados no Supabase via HTTP Request Node.",
+                },
+                {
+                  label: "AI Agent com memória e sub-workflow",
+                  prompt: "Explique como montar um AI Agent no N8N com memória de conversação, usando o nó AI Agent + sub-workflow para delegar tarefas específicas.",
+                },
+                {
+                  label: "Error Workflow com alerta no Slack",
+                  prompt: "Como configurar um Error Workflow no N8N que captura falhas de qualquer workflow e envia um alerta detalhado no Slack com nome do workflow, erro e timestamp?",
+                },
+              ].map((t) => (
+                <button
+                  key={t.label}
+                  onClick={() => { setInput(t.prompt); setN8nMode("manual"); setTimeout(() => taRef.current?.focus(), 50); }}
+                  className="group w-full rounded-xl border border-border bg-card/60 px-3.5 py-2.5 text-left text-[12px] text-muted-foreground transition-all hover:border-rose-500/30 hover:bg-card hover:text-foreground"
+                >
+                  <span className="flex items-center gap-2">
+                    <Workflow className="h-3 w-3 shrink-0 text-rose-500/50 group-hover:text-rose-500 transition-colors" />
+                    {t.label}
+                  </span>
+                </button>
+              ))}
+            </motion.div>
           </div>
         )}
 

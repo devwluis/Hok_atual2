@@ -1,101 +1,139 @@
 "use client";
 import { motion } from "framer-motion";
-import logo from "@/assets/hok-logo.png";
+
+const AMBER = "#F5A623";
+const DIM = "rgba(245,166,35,0.18)";
+
+// 3 neuron positions (equilateral triangle, centered in 120×120 viewBox)
+const NEURONS = [
+  { cx: 60, cy: 18 },   // top
+  { cx: 18, cy: 96 },   // bottom-left
+  { cx: 102, cy: 96 },  // bottom-right
+];
+
+// Connections between neurons
+const EDGES = [
+  { from: 0, to: 1 },
+  { from: 1, to: 2 },
+  { from: 2, to: 0 },
+];
+
+// Animated pulse along an SVG line
+function Pulse({ x1, y1, x2, y2, delay }: { x1: number; y1: number; x2: number; y2: number; delay: number }) {
+  return (
+    <motion.circle
+      r={2.2}
+      fill={AMBER}
+      style={{ filter: `drop-shadow(0 0 4px ${AMBER})` }}
+      initial={{ offsetDistance: "0%" }}
+      animate={{ offsetDistance: ["0%", "100%"] }}
+      transition={{ duration: 1.6, repeat: Infinity, delay, ease: "easeInOut" }}
+      // SVG motion path hack: use attrX/attrY with custom keyframes
+    >
+      <animateMotion
+        dur="1.8s"
+        repeatCount="indefinite"
+        begin={`${delay}s`}
+        path={`M ${x1} ${y1} L ${x2} ${y2}`}
+      />
+    </motion.circle>
+  );
+}
+
+function NeuronDot({ cx, cy, delay }: { cx: number; cy: number; delay: number }) {
+  return (
+    <>
+      {/* outer glow ring */}
+      <motion.circle
+        cx={cx} cy={cy} r={8}
+        fill="none"
+        stroke={AMBER}
+        strokeWidth={0.8}
+        initial={{ opacity: 0.2, scale: 1 }}
+        animate={{ opacity: [0.15, 0.45, 0.15], scale: [1, 1.35, 1] }}
+        transition={{ duration: 2.4, repeat: Infinity, delay, ease: "easeInOut" }}
+        style={{ transformOrigin: `${cx}px ${cy}px` }}
+      />
+      {/* core dot */}
+      <motion.circle
+        cx={cx} cy={cy} r={3.5}
+        fill={AMBER}
+        animate={{ opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 2.4, repeat: Infinity, delay, ease: "easeInOut" }}
+        style={{ filter: `drop-shadow(0 0 6px ${AMBER})` }}
+      />
+    </>
+  );
+}
 
 export function NuclearCore() {
   return (
-    <div className="flex flex-col items-center justify-center gap-6 py-10 select-none">
+    <div className="flex flex-col items-center justify-center gap-5 py-10 select-none">
 
-      {/* ── Central logo com anéis animados ── */}
-      <div className="relative flex h-36 w-36 items-center justify-center">
-
-        {/* Anel externo — respira devagar */}
-        <motion.span
-          className="absolute inset-0 rounded-full"
-          style={{ border: "1px solid rgba(245,166,35,0.15)" }}
-          animate={{ scale: [1, 1.06, 1], opacity: [0.4, 0.7, 0.4] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        {/* Anel médio — rotação suave */}
-        <motion.span
-          className="absolute inset-4 rounded-full"
-          style={{
-            border: "1px dashed rgba(245,166,35,0.25)",
-          }}
-          animate={{ rotate: 360 }}
-          transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        />
-
-        {/* Anel interno — rotação inversa */}
-        <motion.span
-          className="absolute inset-8 rounded-full"
-          style={{ border: "1.5px solid rgba(245,166,35,0.35)" }}
-          animate={{ rotate: -360 }}
-          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-        />
-
-        {/* Ticks nos 4 cantos do anel médio */}
-        {[0, 90, 180, 270].map((deg) => (
-          <motion.span
-            key={deg}
-            className="absolute"
-            style={{
-              width: 6, height: 1.5,
-              background: "rgba(245,166,35,0.5)",
-              borderRadius: 2,
-              top: "50%", left: "50%",
-              transformOrigin: "-46px 0",
-              transform: `rotate(${deg}deg) translateY(-50%)`,
-            }}
-            animate={{ opacity: [0.3, 0.9, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity, delay: deg / 360 * 2 }}
-          />
-        ))}
-
-        {/* Halo de glow por baixo do logo */}
-        <motion.span
-          className="absolute inset-10 rounded-full"
-          animate={{
-            boxShadow: [
-              "0 0 16px 4px rgba(245,166,35,0.12)",
-              "0 0 36px 12px rgba(245,166,35,0.28)",
-              "0 0 16px 4px rgba(245,166,35,0.12)",
-            ],
-          }}
-          transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-        />
-
-        {/* Logo capacete — centro */}
-        <motion.img
-          src={logo}
-          alt="H.O.K."
-          className="relative z-10 h-16 w-16 rounded-2xl object-contain"
-          style={{
-            filter: "drop-shadow(0 4px 16px rgba(245,166,35,0.45))",
-          }}
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 200, damping: 18, delay: 0.1 }}
-          whileHover={{ scale: 1.08, transition: { duration: 0.3 } }}
-        />
-      </div>
-
-      {/* ── Texto ── */}
+      {/* ── 3-neuron SVG ── */}
       <motion.div
-        className="text-center space-y-1.5"
+        initial={{ opacity: 0, scale: 0.88 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        <svg
+          viewBox="0 0 120 120"
+          width={110}
+          height={110}
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ overflow: "visible" }}
+        >
+          {/* ── Edges (static dim lines) ── */}
+          {EDGES.map((e, i) => {
+            const a = NEURONS[e.from];
+            const b = NEURONS[e.to];
+            return (
+              <line
+                key={i}
+                x1={a.cx} y1={a.cy}
+                x2={b.cx} y2={b.cy}
+                stroke={DIM}
+                strokeWidth={0.9}
+              />
+            );
+          })}
+
+          {/* ── Animated pulses along edges ── */}
+          {EDGES.map((e, i) => {
+            const a = NEURONS[e.from];
+            const b = NEURONS[e.to];
+            return (
+              <Pulse
+                key={i}
+                x1={a.cx} y1={a.cy}
+                x2={b.cx} y2={b.cy}
+                delay={i * 0.6}
+              />
+            );
+          })}
+
+          {/* ── Neuron dots ── */}
+          {NEURONS.map((n, i) => (
+            <NeuronDot key={i} cx={n.cx} cy={n.cy} delay={i * 0.4} />
+          ))}
+        </svg>
+      </motion.div>
+
+      {/* ── Label ── */}
+      <motion.div
+        className="text-center space-y-1"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
+        transition={{ delay: 0.35, duration: 0.5 }}
       >
+        <p className="text-[10px] font-mono uppercase tracking-[0.22em]" style={{ color: `${AMBER}99` }}>
+          neurônios
+        </p>
         <p className="text-[15px] font-semibold tracking-tight text-foreground">
           Pronto para trabalhar
         </p>
-        <p className="text-[10px] font-mono uppercase tracking-[0.16em] text-[color:var(--amber)]/70">
-          HOK · Dev &amp; Automação N8N
-        </p>
-        <p className="text-[12px] text-muted-foreground">
-          Como posso ajudar com seu projeto?
+        <p className="text-[11px] font-mono uppercase tracking-[0.14em]" style={{ color: `${AMBER}66` }}>
+          HOK · DEV &amp; AUTOMAÇÃO N8N
         </p>
       </motion.div>
 
