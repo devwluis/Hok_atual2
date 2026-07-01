@@ -8,6 +8,7 @@ export type StreamOpts = {
   baseUrl: string;
   endpointPath?: string;
   token?: string;
+  groqKey?: string;
   messages: StreamMsg[];
   webSearch?: boolean;
   selectedModel?: string;
@@ -73,6 +74,7 @@ export async function streamChat(opts: StreamOpts): Promise<string> {
     baseUrl,
     endpointPath = "/chat/smart",
     token,
+    groqKey,
     messages,
     webSearch,
     selectedModel = "auto",
@@ -102,13 +104,23 @@ export async function streamChat(opts: StreamOpts): Promise<string> {
   //   `stream`   — true for SSE/NDJSON streaming
   const lastUserMessage = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
 
-  const bodyObj: Record<string, unknown> = {
-    message: lastUserMessage,
-    messages,
-    model: selectedModel,
-    stream: true,
-    web_search: !!webSearch,
-  };
+  // When hitting the internal /api/chat fallback, include the Groq key + use model name directly
+  const isInternal = endpointPath === "/api/chat";
+
+  const bodyObj: Record<string, unknown> = isInternal
+    ? {
+        messages,
+        model: selectedModel === "auto" ? "llama-3.3-70b-versatile" : selectedModel,
+        stream: true,
+        apiKey: groqKey,
+      }
+    : {
+        message: lastUserMessage,
+        messages,
+        model: selectedModel,
+        stream: true,
+        web_search: !!webSearch,
+      };
 
   const body = JSON.stringify(bodyObj);
 

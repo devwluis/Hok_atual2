@@ -30,11 +30,15 @@ type Attachment = {
 function readSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return { serverUrl: "", token: "" };
+    if (!raw) return { serverUrl: "", token: "", groqKey: "" };
     const s = JSON.parse(raw) as Record<string, string>;
-    return { serverUrl: s["Server URL"] || "", token: s["HOK_TOKEN"] || "" };
+    return {
+      serverUrl: s["Server URL"] || "",
+      token: s["HOK_TOKEN"] || "",
+      groqKey: s["Groq"] || "",
+    };
   } catch {
-    return { serverUrl: "", token: "" };
+    return { serverUrl: "", token: "", groqKey: "" };
   }
 }
 
@@ -289,7 +293,7 @@ export function ChatScreen() {
     }
     const isN8N = n8nMode !== "off" || detectN8NIntent(t);
 
-    const { serverUrl, token } = readSettings();
+    const { serverUrl, token, groqKey } = readSettings();
 
     if (serverUrl && !token) {
       setError("Configure o HOK_TOKEN nas Configurações para usar o servidor externo.");
@@ -304,9 +308,12 @@ export function ChatScreen() {
 
     abortRef.current = new AbortController();
 
-    // Build messages — inject N8N system prompt at the top when active
+    // System prompt padrão — garante resposta em PT-BR sem reticências
+    const DEFAULT_SYSTEM = `Você é H.O.K., um assistente de IA inteligente e direto, especializado em desenvolvimento de software e automação. Responda sempre em português do Brasil, de forma clara, objetiva e útil. Nunca responda apenas com "..." ou reticências — sempre forneça uma resposta real e completa, mesmo para saudações simples.`;
+
+    // Build messages — N8N mode sobrepõe o prompt padrão
     const outMessages: { role: "user" | "assistant" | "system"; content: string }[] = [
-      ...(isN8N ? [{ role: "system" as const, content: N8N_SYSTEM_PROMPT }] : []),
+      { role: "system" as const, content: isN8N ? N8N_SYSTEM_PROMPT : DEFAULT_SYSTEM },
       ...afterUser.map((m) => ({ role: m.role as "user" | "assistant", content: m.text })),
     ];
 
@@ -316,6 +323,7 @@ export function ChatScreen() {
         baseUrl,
         endpointPath,
         token,
+        groqKey,
         webSearch,
         selectedModel,
         messages: outMessages,
