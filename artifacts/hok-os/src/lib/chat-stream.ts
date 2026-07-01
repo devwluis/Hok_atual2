@@ -21,12 +21,16 @@ function extractDelta(payload: unknown): string {
   if (typeof payload === "string") return payload;
   const p = payload as Record<string, unknown>;
 
-  // HOK-native formats
+  // HOK-native formats (try all common keys)
   if (typeof p.token === "string") return p.token;
   if (typeof p.delta === "string") return p.delta;
   if (typeof p.content === "string") return p.content;
   if (typeof p.text === "string") return p.text;
   if (typeof p.response === "string") return p.response;
+  // HOK /chat/smart can return top-level "message" or "answer"
+  if (typeof p.message === "string" && p.message) return p.message;
+  if (typeof p.answer === "string" && p.answer) return p.answer;
+  if (typeof p.output === "string" && p.output) return p.output;
 
   // OpenAI-style SSE chunk
   const choices = p.choices;
@@ -151,12 +155,17 @@ export async function streamChat(opts: StreamOpts): Promise<string> {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
+    let rawFull = ""; // keep full raw text to fallback-parse if needed
     let done = false;
 
     while (!done) {
       const { value, done: streamDone } = await reader.read();
       done = streamDone;
-      if (value) buf += decoder.decode(value, { stream: !streamDone });
+      if (value) {
+        const chunk = decoder.decode(value, { stream: !streamDone });
+        rawFull += chunk;
+        buf += chunk;
+      }
 
       let idx: number;
       while ((idx = buf.indexOf("\n")) >= 0) {
@@ -177,18 +186,23 @@ export async function streamChat(opts: StreamOpts): Promise<string> {
     }
 
     if (collected) return collected;
-  }
 
-  // Last resort: entire body as single JSON
-  try {
-    const text = await res.text();
-    try {
-      const json = JSON.parse(text) as unknown;
-      const delta = extractDelta(json);
-      if (delta) { onToken(delta); return delta; }
-    } catch { /* not JSON */ }
-    if (text.trim()) { onToken(text.trim()); return text.trim(); }
-  } catch { /* ignore */ }
+    // Body was consumed — use rawFull to try fallback parsing
+    const raw = rawFull.trim();
+    if (raw) {
+      // Try as single JSON object (non-streaming response)
+      try {
+        const json = JSON.parse(raw) as unknown;
+        const delta = extractDelta(json);
+        if (delta) { onToken(delta); return delta; }
+      } catch { /* not JSON */ }
+      // Plain text fallback
+      if (!raw.startsWith("{") && !raw.startsWith("[")) {
+        onToken(raw);
+        return raw;
+      }
+    }
+  }
 
   return collected;
 }
