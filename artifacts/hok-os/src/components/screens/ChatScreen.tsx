@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Globe, Bug, Send, Copy, Webhook, ChevronDown, ChevronUp, Workflow, X } from "lucide-react";
+import { Globe, Bug, Send, Copy, Webhook, ChevronDown, ChevronUp, Workflow, X, Image as ImageIcon, Paperclip, Mic, FileAudio } from "lucide-react";
 import { ElectricCore } from "@/components/chat/ElectricCore";
 import { NuclearCore } from "@/components/chat/NuclearCore";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,15 @@ const N8N_SETTINGS_KEY = "hokma.n8n.settings.v1";
 
 type Msg = ChatMessage & {
   meta?: { ms: number; model?: string };
+};
+
+type Attachment = {
+  id: string;
+  type: "image" | "file" | "audio";
+  name: string;
+  size: number;
+  dataUrl?: string;   // para preview de imagem
+  textContent?: string; // conteúdo de texto (arquivos de código/texto)
 };
 
 function readSettings() {
@@ -157,14 +166,50 @@ export function ChatScreen() {
   const [selectedModel, setSelectedModel] = useState("auto");
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [n8nMode, setN8nMode] = useState<N8NModeState>("off");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const n8nActive = n8nMode !== "off";
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Accumulator ref — accessible in async closure without stale value issues
   const accRef = useRef<string>("");
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Lê arquivo e adiciona ao estado ──
+  const addFile = (file: File, kind: Attachment["type"]) => {
+    const id = crypto.randomUUID();
+    const base: Attachment = { id, type: kind, name: file.name, size: file.size };
+    const reader = new FileReader();
+    if (kind === "image") {
+      reader.onload = () => setAttachments((a) => [...a, { ...base, dataUrl: reader.result as string }]);
+      reader.readAsDataURL(file);
+    } else if (kind === "file" && file.size < 200_000 && /\.(txt|md|json|ts|tsx|js|jsx|py|sh|yaml|yml|env|csv|html|css|xml|toml|sql)$/i.test(file.name)) {
+      reader.onload = () => setAttachments((a) => [...a, { ...base, textContent: reader.result as string }]);
+      reader.readAsText(file);
+    } else {
+      setAttachments((a) => [...a, base]);
+    }
+  };
+
+  const handlePhotoChange  = (e: React.ChangeEvent<HTMLInputElement>) => { [...(e.target.files ?? [])].forEach((f) => addFile(f, "image")); e.target.value = ""; };
+  const handleFileChange   = (e: React.ChangeEvent<HTMLInputElement>) => { [...(e.target.files ?? [])].forEach((f) => addFile(f, "file"));  e.target.value = ""; };
+  const handleAudioChange  = (e: React.ChangeEvent<HTMLInputElement>) => { [...(e.target.files ?? [])].forEach((f) => addFile(f, "audio")); e.target.value = ""; };
+
+  const removeAttachment = (id: string) => setAttachments((a) => a.filter((x) => x.id !== id));
+
+  // Formata anexos como contexto de texto para o prompt
+  const buildAttachmentContext = (atts: Attachment[]): string => {
+    if (!atts.length) return "";
+    return atts.map((a) => {
+      if (a.type === "image") return `[Imagem anexada: ${a.name}]`;
+      if (a.type === "audio") return `[Áudio anexado: ${a.name}]`;
+      if (a.textContent) return `[Arquivo: ${a.name}]\n\`\`\`\n${a.textContent.slice(0, 8000)}\n\`\`\``;
+      return `[Arquivo anexado: ${a.name} (${(a.size / 1024).toFixed(1)} KB)]`;
+    }).join("\n\n");
+  };
 
   const activeModel = getModel(selectedModel);
 
@@ -215,21 +260,26 @@ export function ChatScreen() {
 
   const send = async () => {
     const t = input.trim();
-    if (!t || loading) return;
+    if ((!t && attachments.length === 0) || loading) return;
 
     setError(null);
     let id = conversationId;
     if (!id) {
-      const c = conversationsStore.create(t.slice(0, 40));
+      const c = conversationsStore.create((t || attachments[0]?.name || "Anexo").slice(0, 40));
       id = c.id;
       setConversationId(id);
     }
 
-    const userMsg: Msg = { id: crypto.randomUUID(), role: "user", text: t };
+    // Constrói texto completo com contexto de anexos
+    const attCtx = buildAttachmentContext(attachments);
+    const fullText = [attCtx, t].filter(Boolean).join("\n\n");
+
+    const userMsg: Msg = { id: crypto.randomUUID(), role: "user", text: fullText };
     const afterUser = [...messages, userMsg];
     setMessages(afterUser);
     persist(afterUser, id);
     setInput("");
+    setAttachments([]);
     setLoading(true);
     accRef.current = "";
 
@@ -401,6 +451,11 @@ export function ChatScreen() {
         </div>
       )}
 
+      {/* ── Hidden file inputs ── */}
+      <input ref={photoInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoChange} />
+      <input ref={fileInputRef}  type="file" multiple className="hidden" onChange={handleFileChange} />
+      <input ref={audioInputRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleAudioChange} />
+
       {/* ── Input area ── */}
       <div className="border-t border-border bg-card/80 px-4 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-3 backdrop-blur-xl">
 
@@ -418,8 +473,77 @@ export function ChatScreen() {
           )}
         </AnimatePresence>
 
+        {/* Attachment preview strip */}
+        <AnimatePresence>
+          {attachments.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mb-2 flex gap-2 overflow-x-auto pb-1 thin-scroll"
+            >
+              {attachments.map((att) => (
+                <motion.div
+                  key={att.id}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.8, opacity: 0 }}
+                  className="relative shrink-0 flex items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-1.5"
+                >
+                  {/* Thumbnail para imagem */}
+                  {att.type === "image" && att.dataUrl ? (
+                    <img src={att.dataUrl} alt={att.name} className="h-8 w-8 rounded-lg object-cover" />
+                  ) : att.type === "audio" ? (
+                    <FileAudio className="h-4 w-4 shrink-0 text-[color:var(--amber)]" />
+                  ) : (
+                    <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="max-w-[80px] truncate text-[11px] text-muted-foreground">{att.name}</span>
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-destructive/20 hover:text-destructive transition-colors"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Textarea row */}
         <div className="flex items-end gap-2 rounded-2xl border border-border bg-background px-3 py-2 focus-within:border-[color:var(--amber)] focus-within:shadow-[var(--shadow-amber-glow)] transition-all">
+          {/* Attachment buttons — left side */}
+          <div className="flex items-center gap-0.5 pb-0.5">
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-[color:var(--amber)]"
+              aria-label="Foto"
+              title="Anexar foto"
+            >
+              <ImageIcon className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Arquivo"
+              title="Anexar arquivo"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => audioInputRef.current?.click()}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-[color:var(--amber)]"
+              aria-label="Audio"
+              title="Anexar áudio"
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="mb-1 h-5 w-px shrink-0 bg-border" />
+
           <textarea
             ref={taRef}
             value={input}
@@ -467,10 +591,10 @@ export function ChatScreen() {
             ) : (
               <button
                 onClick={send}
-                disabled={!input.trim()}
+                disabled={!input.trim() && attachments.length === 0}
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full transition",
-                  input.trim()
+                  (input.trim() || attachments.length > 0)
                     ? "bg-[color:var(--amber)] text-[color:var(--amber-foreground)] shadow-[var(--shadow-amber-glow)]"
                     : "bg-muted text-muted-foreground",
                 )}
