@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: models
+    description: AI model catalog operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /models:
+    get:
+      operationId: listModels
+      tags: [models]
+      summary: List available AI models
+      description: Returns a normalized, cached catalog of public Models.dev providers and models.
+      responses:
+        "200":
+          description: Available models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelsResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +48,34 @@ components:
           type: string
       required:
         - status
+    PublicModel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        description:
+          type: string
+      required:
+        - id
+        - name
+        - provider
+    ModelsResponse:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicModel"
+        cached:
+          type: boolean
+        fallback:
+          type: boolean
+      required:
+        - models
+        - cached
+        - fallback
 

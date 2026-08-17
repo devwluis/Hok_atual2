@@ -5,19 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
 
 export interface PublicModel {
   id: string;
   name: string;
   provider: string;
   description?: string;
-}
-
-export interface ModelsResponse {
-  models: PublicModel[];
-  cached: boolean;
-  fallback: boolean;
 }

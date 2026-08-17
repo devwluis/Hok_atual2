@@ -1,0 +1,9 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "jG5b8XJswN6jwa33LmY4F"
+uri = "file://screenshots/hok-os-chat-redesign-mobile-final.jpg"
+type = "image"
+title = "Print final — HOK OS mobile"
+description = "Viewport mobile de 390×844 mostrando os seletores ⚡ IA e ◈ MODO, composer com microfone/envio e a tab bar com os quatro ícones reais."

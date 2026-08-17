@@ -14,3 +14,20 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns a normalized, cached catalog of public Models.dev providers and models.
+ * @summary List available AI models
+ */
+export const ListModelsResponse = zod.object({
+  models: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+      provider: zod.string(),
+      description: zod.string().optional(),
+    }),
+  ),
+  cached: zod.boolean(),
+  fallback: zod.boolean(),
+});

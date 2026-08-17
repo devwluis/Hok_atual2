@@ -5,16 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
-
-export interface PublicModel {
-  id: string;
-  name: string;
-  provider: string;
-  description?: string;
-}
+import type { PublicModel } from "./publicModel";
 
 export interface ModelsResponse {
   models: PublicModel[];

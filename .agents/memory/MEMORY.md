@@ -1,0 +1,1 @@
+- [Artifact asset paths](artifact-asset-paths.md) — public assets in path-routed apps must include the artifact base URL instead of starting at `/`.
