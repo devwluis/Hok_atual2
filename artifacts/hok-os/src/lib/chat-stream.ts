@@ -12,6 +12,9 @@ export type StreamOpts = {
   messages: StreamMsg[];
   webSearch?: boolean;
   selectedModel?: string;
+  forceClaudeCode?: boolean;
+  forceOpenCode?: boolean;
+  forceHermes?: boolean;
   signal?: AbortSignal;
   onToken: (delta: string) => void;
 };
@@ -125,6 +128,9 @@ export async function streamChat(opts: StreamOpts): Promise<string> {
         model: selectedModel,
         stream: true,
         web_search: !!webSearch,
+        ...(opts.forceClaudeCode ? { forceClaudeCode: true } : {}),
+        ...(opts.forceOpenCode ? { forceOpenCode: true } : {}),
+        ...(opts.forceHermes ? { forceHermes: true } : {}),
       };
 
   const body = JSON.stringify(bodyObj);

@@ -45,13 +45,13 @@ type Attachment = {
   textContent?: string; // conteúdo de texto (arquivos de código/texto)
 };
 
-type ComposerMode = "automatic" | "plan" | "build" | "n8n";
+type EngineId = "hok" | "claude" | "opencode" | "hermes";
 
-const MODE_OPTIONS: { id: ComposerMode; label: string; detail: string }[] = [
-  { id: "automatic", label: "Automático", detail: "Detecção de intenção ativa" },
-  { id: "plan", label: "Planejar", detail: "Estrutura antes da execução" },
-  { id: "build", label: "Construir", detail: "Execução direta" },
-  { id: "n8n", label: "N8N Expert", detail: "Workflows e automações" },
+const ENGINE_OPTIONS: { id: EngineId; label: string; detail: string }[] = [
+  { id: "hok", label: "Hok Orquestrador", detail: "Detecção automática de intenção" },
+  { id: "claude", label: "Claude Code Terminal", detail: "Agente terminal com aprovação" },
+  { id: "opencode", label: "OpenCode Terminal", detail: "Agente terminal autônomo" },
+  { id: "hermes", label: "Hermes", detail: "Raciocínio avançado" },
 ];
 
 function readSettings() {
@@ -294,8 +294,8 @@ export function ChatScreen() {
   const [modelCatalog, setModelCatalog] = useState<ChatModel[]>(FALLBACK_MODELS);
   const [modelLoading, setModelLoading] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
-  const [composerMode, setComposerMode] = useState<ComposerMode>("automatic");
-  const [showModePicker, setShowModePicker] = useState(false);
+  const [engineId, setEngineId] = useState<EngineId>("hok");
+  const [showEnginePicker, setShowEnginePicker] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showSecondaryMenu, setShowSecondaryMenu] = useState(false);
   const [n8nMode, setN8nMode] = useState<N8NModeState>("off");
@@ -334,10 +334,9 @@ export function ChatScreen() {
     void loadModels();
   }, [showModelPicker]);
 
-  const handleModeSelect = (mode: ComposerMode) => {
-    setComposerMode(mode);
-    setShowModePicker(false);
-    setN8nMode(mode === "n8n" ? "manual" : "off");
+  const handleEngineSelect = (engine: EngineId) => {
+    setEngineId(engine);
+    setShowEnginePicker(false);
   };
 
   // ── Lê arquivo e adiciona ao estado ──
@@ -374,7 +373,7 @@ export function ChatScreen() {
   };
 
   const activeModel = modelCatalog.find((model) => model.id === selectedModel) ?? getModel(selectedModel);
-  const activeMode = MODE_OPTIONS.find((mode) => mode.id === composerMode) ?? MODE_OPTIONS[0];
+  const activeEngine = ENGINE_OPTIONS.find((engine) => engine.id === engineId) ?? ENGINE_OPTIONS[0];
 
   // Load messages when conversation changes
   useEffect(() => {
@@ -469,15 +468,18 @@ export function ChatScreen() {
 
     // System prompt padrão — garante resposta em PT-BR sem reticências
     const DEFAULT_SYSTEM = `Você é H.O.K., um assistente de IA inteligente e direto, especializado em desenvolvimento de software e automação. Responda sempre em português do Brasil, de forma clara, objetiva e útil. Nunca responda apenas com "..." ou reticências — sempre forneça uma resposta real e completa, mesmo para saudações simples.`;
-    const modeInstruction = composerMode === "plan"
-      ? "Modo Planejar: primeiro apresente a análise, os passos e os riscos. Não execute mudanças antes de explicar o plano."
-      : composerMode === "build"
-        ? "Modo Construir: seja direto e priorize a implementação, validando o resultado ao final."
-        : "";
+
+    // Engine selector — envia o flag correto para o backend escolher o engine
+    const engineForce = {
+      claude: { forceClaudeCode: true } as const,
+      opencode: { forceOpenCode: true } as const,
+      hermes: { forceHermes: true } as const,
+      hok: {} as const,
+    }[engineId];
 
     // Build messages — N8N mode sobrepõe o prompt padrão
     const outMessages: { role: "user" | "assistant" | "system"; content: string }[] = [
-      { role: "system" as const, content: isN8N ? N8N_SYSTEM_PROMPT : [DEFAULT_SYSTEM, modeInstruction].filter(Boolean).join("\n\n") },
+      { role: "system" as const, content: isN8N ? N8N_SYSTEM_PROMPT : DEFAULT_SYSTEM },
       ...afterUser.map((m) => ({ role: m.role as "user" | "assistant", content: m.text })),
     ];
 
@@ -490,6 +492,7 @@ export function ChatScreen() {
         groqKey,
         webSearch,
         selectedModel,
+        ...engineForce,
         messages: outMessages,
         signal: abortRef.current.signal,
         onToken: (delta) => {
@@ -608,7 +611,7 @@ export function ChatScreen() {
               )}
             </span>
             <button
-              onClick={() => { setN8nMode("off"); setComposerMode("automatic"); }}
+              onClick={() => { setN8nMode("off"); setEngineId("hok"); }}
               className="rounded-md p-0.5 text-rose-400/60 hover:text-rose-400 transition-colors"
               title="Desativar modo N8N"
               aria-label="Desativar modo N8N"
@@ -639,7 +642,7 @@ export function ChatScreen() {
           <div className="relative min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => { setShowModelPicker((value) => !value); setShowModePicker(false); }}
+              onClick={() => { setShowModelPicker((value) => !value); setShowEnginePicker(false); }}
               className="hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-secondary px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60"
               aria-expanded={showModelPicker}
               aria-controls="model-menu"
@@ -680,65 +683,65 @@ export function ChatScreen() {
           <div className="relative min-w-0 flex-1">
             <button
               type="button"
-              onClick={() => { setShowModePicker((value) => !value); setShowModelPicker(false); }}
+              onClick={() => { setShowEnginePicker((value) => !value); setShowModelPicker(false); }}
               className={cn(
                 "hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border bg-secondary px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60",
                 n8nActive ? "border-rose-500/40" : "border-border",
               )}
-              aria-expanded={showModePicker}
-              aria-controls="mode-menu"
-              data-testid="button-mode-selector"
+              aria-expanded={showEnginePicker}
+              aria-controls="engine-menu"
+              data-testid="button-engine-selector"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="shrink-0 font-mono text-[10px] tracking-[0.08em] text-muted-foreground">◈ MODO</span>
-                <span className={cn("truncate text-[12px] font-semibold", n8nActive ? "text-rose-300" : "text-[color:var(--amber)]")}>{activeMode.label}</span>
+                <span className="shrink-0 font-mono text-[10px] tracking-[0.08em] text-muted-foreground">◈ ENGINE</span>
+                <span className={cn("truncate text-[12px] font-semibold", n8nActive ? "text-rose-300" : "text-[color:var(--amber)]")}>{activeEngine.label}</span>
               </span>
-              {showModePicker ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+              {showEnginePicker ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
             </button>
             <AnimatePresence>
-              {showModePicker && (
+              {showEnginePicker && (
                 <motion.div
-                  id="mode-menu"
+                  id="engine-menu"
                   initial={{ opacity: 0, y: 5, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.98 }}
                   className="absolute bottom-[calc(100%+8px)] right-0 z-40 w-[min(250px,calc(100vw-20px))] rounded-2xl border border-border bg-popover p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
                 >
                   <div className="flex items-center justify-between px-2 py-1.5">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Modo de operação</span>
+                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Motor de processamento</span>
                     <button
                       type="button"
-                      onClick={() => setShowModePicker(false)}
+                      onClick={() => setShowEnginePicker(false)}
                       className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]"
-                      aria-label="Fechar seletor de modo"
+                      aria-label="Fechar seletor de engine"
                       data-testid="button-mode-picker-close"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  {MODE_OPTIONS.map((mode) => (
+                  {ENGINE_OPTIONS.map((engine) => (
                     <button
                       type="button"
-                      key={mode.id}
-                      onClick={() => handleModeSelect(mode.id)}
+                      key={engine.id}
+                      onClick={() => handleEngineSelect(engine.id)}
                       className={cn(
                         "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[color:var(--amber)]/10",
-                        composerMode === mode.id ? "bg-[color:var(--amber)]/10 text-[color:var(--amber)]" : "text-foreground",
+                        engineId === engine.id ? "bg-[color:var(--amber)]/10 text-[color:var(--amber)]" : "text-foreground",
                       )}
-                      data-testid={`button-mode-${mode.id}`}
+                      data-testid={`button-engine-${engine.id}`}
                     >
                       <span>
-                        <span className="block text-[12px] font-semibold">{mode.label}</span>
-                        <span className="block text-[10px] text-muted-foreground">{mode.detail}</span>
+                        <span className="block text-[12px] font-semibold">{engine.label}</span>
+                        <span className="block text-[10px] text-muted-foreground">{engine.detail}</span>
                       </span>
-                      {composerMode === mode.id && <Check className="h-3.5 w-3.5 text-emerald-400" />}
+                      {engineId === engine.id && <Check className="h-3.5 w-3.5 text-emerald-400" />}
                     </button>
                   ))}
                 </motion.div>
               )}
             </AnimatePresence>
-            {showModePicker && (
-              <div className="fixed inset-0 z-30" onClick={() => setShowModePicker(false)} aria-hidden="true" />
+            {showEnginePicker && (
+              <div className="fixed inset-0 z-30" onClick={() => setShowEnginePicker(false)} aria-hidden="true" />
             )}
           </div>
         </div>
