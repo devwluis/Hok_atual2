@@ -161,6 +161,13 @@ function MessageBubble({ msg, onSendToWebhook }: { msg: Msg; onSendToWebhook?: (
 }
 
 // ── Model picker ──────────────────────────────────────────────────────────────
+const PROVIDER_LABELS: Record<string, string> = {
+  "OpenCode Zen": "OpenCode (Zen)",
+  Openrouter: "OpenRouter",
+  OpenRouter: "OpenRouter",
+  Google: "Google",
+};
+
 function ModelPicker({
   selected,
   models,
@@ -168,6 +175,7 @@ function ModelPicker({
   error,
   onSelect,
   onRetry,
+  onClose,
 }: {
   selected: string;
   models: ChatModel[];
@@ -175,18 +183,43 @@ function ModelPicker({
   error: string | null;
   onSelect: (id: string) => void;
   onRetry: () => void;
+  onClose: () => void;
 }) {
-  const providers = models.reduce<Record<string, ChatModel[]>>((groups, model) => {
+  const [query, setQuery] = useState("");
+  const filtered = query.trim()
+    ? models.filter((m) => m.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : models;
+  const providers = filtered.reduce<Record<string, ChatModel[]>>((groups, model) => {
     const provider = model.provider || "Outro";
     (groups[provider] ||= []).push(model);
     return groups;
   }, {});
 
   return (
-    <div className="thin-scroll max-h-[min(280px,45dvh)] overflow-y-auto rounded-2xl border border-border bg-[#11151c] p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]">
+    <div className="thin-scroll max-h-[min(320px,50dvh)] overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]">
       <div className="flex items-center justify-between px-2 py-1.5">
         <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Catálogo de IA</span>
-        {loading && <span className="font-mono text-[9px] text-[color:var(--amber)]">sincronizando</span>}
+        <div className="flex items-center gap-1.5">
+          {loading && <span className="font-mono text-[9px] text-[color:var(--amber)]">sincronizando</span>}
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]"
+            aria-label="Fechar catálogo"
+            data-testid="button-model-picker-close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <div className="mb-1 px-1">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar modelo por nome..."
+          className="w-full rounded-xl border border-border bg-background px-2.5 py-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:border-[color:var(--amber)]"
+          data-testid="input-model-search"
+        />
       </div>
       {error && (
         <div className="mb-1 rounded-xl border border-red-500/20 bg-red-500/5 px-2.5 py-2 text-[10px] text-red-300">
@@ -202,9 +235,14 @@ function ModelPicker({
           <div className="h-8 animate-pulse rounded-lg bg-white/[0.04]" />
         </div>
       )}
+      {!loading && filtered.length === 0 && (
+        <div className="px-2 py-4 text-center text-[11px] text-muted-foreground">Nenhum modelo para "{query}"</div>
+      )}
       {!loading && Object.entries(providers).map(([provider, providerModels]) => (
         <div key={provider} className="mt-1">
-          <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70">{provider}</div>
+          <div className="px-2 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70">
+            {PROVIDER_LABELS[provider] ?? provider}
+          </div>
           <div className="space-y-0.5">
             {providerModels.map((model) => (
               <button
@@ -213,15 +251,25 @@ function ModelPicker({
                 onClick={() => onSelect(model.id)}
                 title={model.description}
                 className={cn(
-                  "flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[color:var(--amber)]/10",
+                  "flex w-full items-center justify-between gap-1.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[color:var(--amber)]/10",
                   selected === model.id ? "bg-[color:var(--amber)]/10 text-[color:var(--amber)]" : "text-foreground",
                 )}
               >
-                <span className="min-w-0">
-                  <span className="block truncate text-[12px] font-semibold">{model.label}</span>
-                  <span className="block truncate text-[10px] text-muted-foreground">{model.description}</span>
+                <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+                  <span className="truncate text-[12px] font-semibold">{model.label}</span>
+                  <span className="shrink-0 font-mono text-[9px] text-muted-foreground/70">— {PROVIDER_LABELS[model.provider] ?? model.provider}</span>
                 </span>
-                {selected === model.id && <Check className="ml-2 h-3.5 w-3.5 shrink-0 text-emerald-400" />}
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-semibold",
+                    model.free === false
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-emerald-500/15 text-emerald-500",
+                  )}
+                >
+                  {model.free === false ? "Pago" : "Free"}
+                </span>
+                {selected === model.id && <Check className="ml-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />}
               </button>
             ))}
           </div>
@@ -251,6 +299,7 @@ export function ChatScreen() {
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [showSecondaryMenu, setShowSecondaryMenu] = useState(false);
   const [n8nMode, setN8nMode] = useState<N8NModeState>("off");
+  const [isTextareaFocused, setIsTextareaFocused] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const n8nActive = n8nMode !== "off";
@@ -583,7 +632,7 @@ export function ChatScreen() {
       <input ref={audioInputRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleAudioChange} />
 
       {/* ── Input area ── */}
-      <div className="hok-composer relative border-t border-border bg-[#0d1118]/90 px-4 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-3 backdrop-blur-xl">
+      <div className="hok-composer relative border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom)+80px)] pt-3 backdrop-blur-xl">
 
         {/* The two command selectors stay above the text field on purpose. */}
         <div className="mb-2 flex gap-2">
@@ -591,7 +640,7 @@ export function ChatScreen() {
             <button
               type="button"
               onClick={() => { setShowModelPicker((value) => !value); setShowModePicker(false); }}
-              className="hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-[#161b24] px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60"
+              className="hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-secondary px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60"
               aria-expanded={showModelPicker}
               aria-controls="model-menu"
               data-testid="button-model-selector"
@@ -609,7 +658,7 @@ export function ChatScreen() {
                   initial={{ opacity: 0, y: 5, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.98 }}
-                  className="absolute bottom-[calc(100%+8px)] left-0 z-40 w-[min(320px,calc(100vw-20px))]"
+                  className="absolute bottom-[calc(100%+8px)] left-0 z-40 w-[min(340px,calc(100vw-20px))]"
                 >
                   <ModelPicker
                     selected={selectedModel}
@@ -617,11 +666,15 @@ export function ChatScreen() {
                     loading={modelLoading}
                     error={modelError}
                     onRetry={() => void loadModels(true)}
+                    onClose={() => setShowModelPicker(false)}
                     onSelect={(id) => { setSelectedModel(id); setShowModelPicker(false); }}
                   />
                 </motion.div>
               )}
             </AnimatePresence>
+            {showModelPicker && (
+              <div className="fixed inset-0 z-30" onClick={() => setShowModelPicker(false)} aria-hidden="true" />
+            )}
           </div>
 
           <div className="relative min-w-0 flex-1">
@@ -629,7 +682,7 @@ export function ChatScreen() {
               type="button"
               onClick={() => { setShowModePicker((value) => !value); setShowModelPicker(false); }}
               className={cn(
-                "hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border bg-[#161b24] px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60",
+                "hok-console-button flex w-full items-center justify-between gap-2 rounded-xl border bg-secondary px-2.5 py-2 text-left hover:border-[color:var(--amber)]/60",
                 n8nActive ? "border-rose-500/40" : "border-border",
               )}
               aria-expanded={showModePicker}
@@ -649,9 +702,20 @@ export function ChatScreen() {
                   initial={{ opacity: 0, y: 5, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.98 }}
-                  className="absolute bottom-[calc(100%+8px)] right-0 z-40 w-[min(250px,calc(100vw-20px))] rounded-2xl border border-border bg-[#11151c] p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
+                  className="absolute bottom-[calc(100%+8px)] right-0 z-40 w-[min(250px,calc(100vw-20px))] rounded-2xl border border-border bg-popover p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
                 >
-                  <div className="px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Modo de operação</div>
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-muted-foreground">Modo de operação</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowModePicker(false)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]"
+                      aria-label="Fechar seletor de modo"
+                      data-testid="button-mode-picker-close"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   {MODE_OPTIONS.map((mode) => (
                     <button
                       type="button"
@@ -673,6 +737,9 @@ export function ChatScreen() {
                 </motion.div>
               )}
             </AnimatePresence>
+            {showModePicker && (
+              <div className="fixed inset-0 z-30" onClick={() => setShowModePicker(false)} aria-hidden="true" />
+            )}
           </div>
         </div>
 
@@ -715,13 +782,13 @@ export function ChatScreen() {
         </AnimatePresence>
 
         {/* Textarea row */}
-        <div className="flex items-end gap-2 rounded-2xl border border-border bg-[#11151c] px-2.5 py-2 focus-within:border-[color:var(--amber)] focus-within:shadow-[var(--shadow-amber-glow)] transition-all">
+        <div className={cn("flex items-end gap-2 rounded-2xl border bg-popover px-2.5 py-2 transition-all", isTextareaFocused ? "border-[color:var(--amber)] shadow-[var(--shadow-amber-glow)]" : "border-border")}>
           {/* Attachment affordance. The menu keeps the row quiet on mobile. */}
           <div className="relative pb-0.5">
             <button
               type="button"
               onClick={() => setShowPlusMenu((value) => !value)}
-              className="hok-console-button flex h-9 w-9 items-center justify-center rounded-full border border-border bg-[#161b24] text-[color:var(--amber)] hover:border-[color:var(--amber)]/60 hover:bg-[color:var(--amber)]/10"
+              className="hok-console-button flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary text-[color:var(--amber)] hover:border-[color:var(--amber)]/60 hover:bg-[color:var(--amber)]/10"
               aria-label="Adicionar anexo"
               aria-expanded={showPlusMenu}
               data-testid="button-open-attachments"
@@ -734,20 +801,33 @@ export function ChatScreen() {
                   initial={{ opacity: 0, y: 5, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.98 }}
-                  className="absolute bottom-[calc(100%+8px)] left-0 z-40 grid w-[190px] grid-cols-3 gap-1 rounded-2xl border border-border bg-[#11151c] p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
+                  className="absolute bottom-[calc(100%+8px)] left-0 z-40 w-[190px] rounded-2xl border border-border bg-popover p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
                 >
-                  <button type="button" onClick={() => { photoInputRef.current?.click(); setShowPlusMenu(false); }} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[10px] text-muted-foreground hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]" data-testid="button-attach-photo">
-                    <ImageIcon className="h-4 w-4" /> Foto
-                  </button>
-                  <button type="button" onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[10px] text-muted-foreground hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]" data-testid="button-attach-file">
-                    <Paperclip className="h-4 w-4" /> Arquivo
-                  </button>
-                  <button type="button" onClick={() => { audioInputRef.current?.click(); setShowPlusMenu(false); }} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[10px] text-muted-foreground hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]" data-testid="button-attach-audio">
-                    <Mic className="h-4 w-4" /> Áudio
-                  </button>
+                  <div className="flex items-center justify-end px-1 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowPlusMenu(false)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]"
+                      aria-label="Fechar menu de anexos"
+                      data-testid="button-plus-menu-close"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button type="button" onClick={() => { photoInputRef.current?.click(); setShowPlusMenu(false); }} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[10px] text-muted-foreground hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]" data-testid="button-attach-photo">
+                      <ImageIcon className="h-4 w-4" /> Foto
+                    </button>
+                    <button type="button" onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false); }} className="flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-[10px] text-muted-foreground hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]" data-testid="button-attach-file">
+                      <Paperclip className="h-4 w-4" /> Arquivo
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
+            {showPlusMenu && (
+              <div className="fixed inset-0 z-30" onClick={() => setShowPlusMenu(false)} aria-hidden="true" />
+            )}
           </div>
 
           {/* Divider */}
@@ -757,6 +837,8 @@ export function ChatScreen() {
             ref={taRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onFocus={() => setIsTextareaFocused(true)}
+            onBlur={() => setIsTextareaFocused(false)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
             placeholder="Insira sua instrução, Sr."
             rows={1}
@@ -781,8 +863,19 @@ export function ChatScreen() {
                   initial={{ opacity: 0, y: 5, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 5, scale: 0.98 }}
-                  className="absolute bottom-[calc(100%+8px)] right-0 z-40 w-[176px] rounded-2xl border border-border bg-[#11151c] p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
+                  className="absolute bottom-[calc(100%+8px)] right-0 z-40 w-[176px] rounded-2xl border border-border bg-popover p-1.5 shadow-[0_16px_34px_rgb(0_0_0/0.45)]"
                 >
+                  <div className="flex items-center justify-end px-1 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowSecondaryMenu(false)}
+                      className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-[color:var(--amber)]/10 hover:text-[color:var(--amber)]"
+                      aria-label="Fechar opções"
+                      data-testid="button-secondary-close"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <button type="button" onClick={() => setWebSearch((value) => !value)} className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-[11px] text-foreground hover:bg-[color:var(--amber)]/10" data-testid="button-web-search">
                     <span className="flex items-center gap-2"><Globe className="h-3.5 w-3.5" /> Busca web</span>
                     <span className={cn("h-1.5 w-1.5 rounded-full", webSearch ? "bg-emerald-400" : "bg-muted-foreground/40")} />
@@ -794,6 +887,9 @@ export function ChatScreen() {
                 </motion.div>
               )}
             </AnimatePresence>
+            {showSecondaryMenu && (
+              <div className="fixed inset-0 z-30" onClick={() => setShowSecondaryMenu(false)} aria-hidden="true" />
+            )}
             </div>
 
             {/* Real mic affordance remains immediately beside send/stop. */}

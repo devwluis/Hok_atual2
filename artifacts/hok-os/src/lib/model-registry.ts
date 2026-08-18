@@ -5,13 +5,13 @@ export type ApiModel = {
   name: string;
   provider: string;
   description?: string;
+  free?: boolean;
 };
 
 export type ChatModel = HokModel & {
   source: "api" | "fallback";
+  free?: boolean;
 };
-
-type ModelsResponse = { models?: ApiModel[] };
 
 const CACHE_TTL = 60 * 60 * 1000;
 let cachedModels: ApiModel[] | null = null;
@@ -31,8 +31,26 @@ export function toChatModel(model: ApiModel): ChatModel {
     provider: model.provider || "Outro",
     color: fallback?.color ?? "var(--amber)",
     description: model.description || fallback?.description || "Modelo disponível no HOK OS",
+    free: model.free,
     source: "api",
   };
+}
+
+type CatalogModel = ApiModel & { label?: string };
+type CatalogProvider = { provider: string; models?: CatalogModel[] };
+type CatalogResponse = { status?: string; providers?: CatalogProvider[] };
+
+const SETTINGS_KEY = "hokma.settings.v1";
+
+function readHokToken(): string {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return "";
+    const s = JSON.parse(raw) as Record<string, string>;
+    return s["HOK_TOKEN"] || "";
+  } catch {
+    return "";
+  }
 }
 
 export async function fetchModelCatalog(force = false): Promise<ChatModel[]> {
@@ -40,21 +58,34 @@ export async function fetchModelCatalog(force = false): Promise<ChatModel[]> {
     return cachedModels.map(toChatModel);
   }
 
-  const response = await fetch("/api/models", {
+  const token = readHokToken();
+  if (!token) {
+    throw new Error("Configure o HOK_TOKEN nas Configurações para carregar o catálogo");
+  }
+
+  const response = await fetch("/models/catalog", {
     method: "GET",
-    credentials: "include",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "X-Hok-Token": token },
   });
   if (!response.ok) throw new Error(`Não foi possível carregar os modelos (${response.status})`);
 
-  const payload = (await response.json()) as ModelsResponse;
-  if (!Array.isArray(payload.models) || payload.models.length === 0) {
+  const payload = (await response.json()) as CatalogResponse;
+  const models: ApiModel[] = (payload.providers ?? []).flatMap((p) =>
+    (p.models ?? []).map((model) => ({
+      id: model.id,
+      name: model.name || model.label || model.id,
+      provider: model.provider || p.provider,
+      description: model.description,
+      free: model.free,
+    })),
+  );
+
+  if (models.length === 0) {
     throw new Error("A lista de modelos retornou vazia");
   }
 
-  cachedModels = payload.models.filter(
-    (model): model is ApiModel =>
-      Boolean(model && typeof model.id === "string" && typeof model.name === "string"),
+  cachedModels = models.filter(
+    (model): model is ApiModel => Boolean(model && typeof model.id === "string" && typeof model.name === "string"),
   );
   cachedAt = Date.now();
   return cachedModels.map(toChatModel);
