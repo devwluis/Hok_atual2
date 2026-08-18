@@ -27,7 +27,8 @@ function extractDelta(payload: unknown): string {
   if (typeof p.content === "string") return p.content;
   if (typeof p.text === "string") return p.text;
   if (typeof p.response === "string") return p.response;
-  // HOK /chat/smart can return top-level "message" or "answer"
+  // HOK /chat/smart can return top-level "reply" or "message" or "answer"
+  if (typeof p.reply === "string" && p.reply) return p.reply;
   if (typeof p.message === "string" && p.message) return p.message;
   if (typeof p.answer === "string" && p.answer) return p.answer;
   if (typeof p.output === "string" && p.output) return p.output;

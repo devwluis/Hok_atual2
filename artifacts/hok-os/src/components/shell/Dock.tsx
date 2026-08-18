@@ -11,7 +11,7 @@ const ITEMS: { id: ScreenId; label: string; icon: string }[] = [
   { id: "settings", label: "Config", icon: "hok-config.png" },
 ];
 
-const iconUrl = (fileName: string) => `${import.meta.env.BASE_URL}icons/${fileName}`;
+const iconUrl = (fileName: string) => `${import.meta.env.BASE_URL}icons/${fileName}?v=2`;
 
 export function Dock() {
   const { screen, setScreen } = useAppState();
@@ -22,7 +22,7 @@ export function Dock() {
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
-        className="pointer-events-auto flex items-center gap-1 rounded-[28px] border border-border bg-[#11151c]/95 px-2.5 py-2 shadow-[var(--shadow-window)] backdrop-blur-xl"
+        className="pointer-events-auto flex items-center gap-1 rounded-[28px] border border-border bg-popover/95 px-2.5 py-2 shadow-[var(--shadow-window)] backdrop-blur-xl"
       >
         {ITEMS.map(({ id, label, icon }) => {
           const active = screen === id;
