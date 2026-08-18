@@ -143,10 +143,14 @@ function WorkflowsPanel({
     setError(null);
 
     const proxyCall = async (path: string) => {
+      // O proxy do backend usa a N8N_API_KEY interna quando o token vem vazio.
+      // Token de usuário inválido (ex: key revogada) quebra a lista inteira —
+      // só envia token se parecer uma API key real do n8n.
+      const effectiveToken = token.startsWith("n8n_api_") ? token : "";
       const res = await fetch(`${window.location.origin}/api/n8n-proxy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseUrl, token, path }),
+        body: JSON.stringify({ baseUrl, token: effectiveToken, path }),
         signal: abortRef.current?.signal,
       });
       if (!res.ok) {
