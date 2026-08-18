@@ -1,8 +1,13 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, Circle, Wifi, WifiOff } from "lucide-react";
+import { Send, Circle, Wifi, WifiOff, PanelLeft, Terminal, FileCode2 } from "lucide-react";
+import { FileTree } from "@/components/terminal/FileTree";
+import { EditorPane } from "@/components/terminal/EditorPane";
 
 const SETTINGS_KEY = "hokma.settings.v1";
+const FS_ROOT = "/root/hokma";
+
+type EditorView = "terminal" | "editor";
 
 function readSettings(): { serverUrl: string; token: string } {
   try {
@@ -59,6 +64,9 @@ export function TerminalScreen() {
   const [histIdx, setHistIdx] = useState(-1);
   const [running, setRunning] = useState(false);
   const [connected, setConnected] = useState<boolean | null>(null);
+  const [view, setView] = useState<EditorView>("terminal");
+  const [showFiles, setShowFiles] = useState(false);
+  const [editorPath, setEditorPath] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -142,10 +150,48 @@ export function TerminalScreen() {
   const statusColor = connected === true ? "#22c55e" : connected === false ? "#ef4444" : "#f59e0b";
   const statusLabel = connected === true ? "LIVE" : connected === false ? "OFFLINE" : "...";
 
+  const openInEditor = (path: string) => {
+    setEditorPath(path);
+    setView("editor");
+  };
+
   return (
     <div className="flex h-full flex-col bg-[#0d1117] font-mono text-emerald-400">
       <div className="flex items-center justify-between border-b border-emerald-900/40 px-3 py-2 text-[11px]">
-        <span className="text-emerald-300/80">HOK Server · shell</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFiles((v) => !v)}
+            className={`rounded-md p-1.5 transition-colors ${showFiles ? "bg-emerald-500/20 text-emerald-300" : "text-emerald-500 hover:bg-emerald-500/10"}`}
+            aria-label="Alternar explorador de arquivos"
+            aria-expanded={showFiles}
+            data-testid="button-toggle-files"
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
+          <div className="flex items-center rounded-lg border border-emerald-900/50 bg-emerald-500/5 p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("terminal")}
+              className={view === "terminal"
+                ? "flex items-center gap-1 rounded-md bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-300"
+                : "flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-emerald-600 hover:text-emerald-300"}
+              data-testid="button-view-terminal"
+            >
+              <Terminal className="h-3 w-3" /> Terminal
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (view !== "editor") setView("editor"); }}
+              className={view === "editor"
+                ? "flex items-center gap-1 rounded-md bg-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-300"
+                : "flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-emerald-600 hover:text-emerald-300"}
+              data-testid="button-view-editor"
+            >
+              <FileCode2 className="h-3 w-3" /> Editor
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           {connected === true
             ? <Wifi className="h-3.5 w-3.5 text-emerald-400" />
@@ -158,37 +204,53 @@ export function TerminalScreen() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-emerald-900/40 px-3 py-2">
-        {QUICK.map((q) => (
-          <button key={q} onClick={() => run(q)} disabled={running}
-            className="rounded-md border border-emerald-900/50 bg-emerald-500/5 px-2 py-1 text-[11px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40">
-            {q.length > 18 ? q.slice(0, 16) + "…" : q}
-          </button>
-        ))}
-      </div>
+      <div className="flex min-h-0 flex-1">
+        {showFiles && (
+          <aside className="w-[220px] shrink-0 border-r border-emerald-900/40" data-testid="files-sidebar">
+            <FileTree serverUrl={""} token={""} rootPath={FS_ROOT} selected={editorPath} onSelect={openInEditor} />
+          </aside>
+        )}
 
-      <div className="thin-scroll flex-1 overflow-y-auto px-3 py-2 text-[12.5px] leading-relaxed"
-        onClick={() => inputRef.current?.focus()}>
-        {lines.map((l, i) => (
-          <div key={i} className="whitespace-pre-wrap" style={{
-            color: l.startsWith("$") ? "#34d399" : l.startsWith("  [erro]") ? "#f87171" : "#6ee7b7",
-          }}>{l}</div>
-        ))}
-        {running && <div className="text-emerald-600 animate-pulse">▋ executando…</div>}
-        <div ref={endRef} />
-      </div>
+        {view === "editor" ? (
+          <div className="min-w-0 flex-1" data-testid="editor-pane">
+            <EditorPane filePath={editorPath} onClose={() => setEditorPath(null)} />
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="flex flex-wrap gap-1 border-b border-emerald-900/40 px-3 py-2">
+              {QUICK.map((q) => (
+                <button key={q} onClick={() => run(q)} disabled={running}
+                  className="rounded-md border border-emerald-900/50 bg-emerald-500/5 px-2 py-1 text-[11px] text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40">
+                  {q.length > 18 ? q.slice(0, 16) + "…" : q}
+                </button>
+              ))}
+            </div>
 
-      <div className="flex items-center gap-2 border-t border-emerald-900/40 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+96px)]">
-        <span className="text-emerald-500">{">"}</span>
-        <input ref={inputRef} value={cmd} onChange={(e) => setCmd(e.target.value)}
-          onKeyDown={onKeyDown} disabled={running} autoComplete="off" spellCheck={false}
-          placeholder={running ? "aguardando… (Ctrl+C cancelar)" : "comando…"}
-          className="flex-1 bg-transparent text-sm text-emerald-300 outline-none placeholder:text-emerald-800 disabled:opacity-50"
-          autoFocus />
-        <button onClick={() => run()} disabled={running || !cmd.trim()}
-          className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40">
-          <Send className="h-4 w-4" />
-        </button>
+            <div className="thin-scroll flex-1 overflow-y-auto px-3 py-2 text-[12.5px] leading-relaxed"
+              onClick={() => inputRef.current?.focus()}>
+              {lines.map((l, i) => (
+                <div key={i} className="whitespace-pre-wrap" style={{
+                  color: l.startsWith("$") ? "#34d399" : l.startsWith("  [erro]") ? "#f87171" : "#6ee7b7",
+                }}>{l}</div>
+              ))}
+              {running && <div className="text-emerald-600 animate-pulse">▋ executando…</div>}
+              <div ref={endRef} />
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-emerald-900/40 px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+96px)]">
+              <span className="text-emerald-500">{">"}</span>
+              <input ref={inputRef} value={cmd} onChange={(e) => setCmd(e.target.value)}
+                onKeyDown={onKeyDown} disabled={running} autoComplete="off" spellCheck={false}
+                placeholder={running ? "aguardando… (Ctrl+C cancelar)" : "comando…"}
+                className="flex-1 bg-transparent text-sm text-emerald-300 outline-none placeholder:text-emerald-800 disabled:opacity-50"
+                autoFocus />
+              <button onClick={() => run()} disabled={running || !cmd.trim()}
+                className="rounded-md bg-emerald-500/15 p-1.5 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40">
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
